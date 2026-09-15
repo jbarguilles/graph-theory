@@ -1,0 +1,14 @@
+# NetBeans build output
+build/
+dist/
+out/
+
+# macOS metadata
+.DS_Store
+
+# NetBeans cache/private settings
+nbproject/private/
+
+# Temp files
+fName
+*.tmp
