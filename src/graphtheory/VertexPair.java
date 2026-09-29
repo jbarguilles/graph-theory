@@ -5,9 +5,13 @@
 package graphtheory;
 
 import java.util.ArrayList;
-import java.util.Vector;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.Queue;
+import java.util.Vector;
 
 /**
  *
@@ -27,30 +31,54 @@ public class VertexPair {
 
 
     public int getShortestDistance() {
-        //simple BFS
         Vector<Vertex> visitedNodes = new Vector<Vertex>();
-        visitedNodes.add(vertex1);      //root node = vertex1
+        visitedNodes.add(vertex1);
 
         int counter = 0;
         while (!visitedNodes.contains(vertex2)) {
-
             int workingSize = visitedNodes.size();
             for (int i = counter; i < workingSize; i++) {
-                for (Vertex x : visitedNodes.get(i).undirectedNeighbors) {
-                    if (!visitedNodes.contains(x)) {
-                        visitedNodes.add(x);
-                    }
+                Vertex cur = visitedNodes.get(i);
+                for (Vertex x : cur.undirectedNeighbors) {
+                    if (!visitedNodes.contains(x)) visitedNodes.add(x);
+                }
+                for (Vertex x : cur.outNeighbors) {
+                    if (!visitedNodes.contains(x)) visitedNodes.add(x);
                 }
             }
             counter++;
-            if (workingSize == visitedNodes.size()) // if list not growing, pair is disconnected
-            {
-                return -1;
+            if (workingSize == visitedNodes.size()) return -1;
+        }
+        return counter;
+    }
+
+    /** Returns the actual vertex sequence of the shortest (geodesic) path, or null if unreachable. */
+    public Vector<Vertex> getShortestPath() {
+        if (vertex1 == vertex2) {
+            Vector<Vertex> p = new Vector<Vertex>();
+            p.add(vertex1);
+            return p;
+        }
+        Map<Vertex, Vertex> parent = new HashMap<Vertex, Vertex>();
+        Queue<Vertex> queue = new LinkedList<Vertex>();
+        queue.add(vertex1);
+        parent.put(vertex1, null);
+        while (!queue.isEmpty()) {
+            Vertex cur = queue.poll();
+            if (cur == vertex2) break;
+            for (Vertex n : cur.undirectedNeighbors) {
+                if (!parent.containsKey(n)) { parent.put(n, cur); queue.add(n); }
+            }
+            for (Vertex n : cur.outNeighbors) {
+                if (!parent.containsKey(n)) { parent.put(n, cur); queue.add(n); }
             }
         }
-
-        return counter;
-
+        if (!parent.containsKey(vertex2)) return null;
+        Vector<Vertex> path = new Vector<Vertex>();
+        for (Vertex cur = vertex2; cur != null; cur = parent.get(cur)) {
+            path.insertElementAt(cur, 0);
+        }
+        return path;
     }
 
     public void generateVertexDisjointPaths() {
@@ -129,8 +157,15 @@ public class VertexPair {
                     visitedNodes.setSize(origSize);
                 }
             }
+            for (Vertex x : v.outNeighbors) {
+                if (!visitedNodes.contains(x)) {
+                    int origSize = visitedNodes.size();
+                    visitedNodes.add(x);
+                    recursePaths(x, visitedNodes);
+                    visitedNodes.setSize(origSize);
+                }
+            }
         }
-
     }
     // public void
 

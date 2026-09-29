@@ -10,6 +10,8 @@ public class Edge {
     public boolean directed;
     public boolean wasFocused;
     public boolean wasClicked;
+    public int weight = 1;
+    public boolean isBridge;
 
     public Edge(Vertex v1, Vertex v2, boolean directed) {
         vertex1 = v1;
@@ -26,12 +28,13 @@ public class Edge {
             g.setColor(Color.red);
         } else if (wasFocused) {
             g.setColor(Color.blue);
+        } else if (isBridge) {
+            g.setColor(new Color(150, 0, 200));   // purple = bridge
         } else {
             g.setColor(Color.black);
         }
 
         if (isSelfLoop()) {
-            // draw a small circle above the vertex
             int lx = vertex1.location.x;
             int ly = vertex1.location.y;
             g.drawOval(lx - 10, ly - 40, 24, 24);
@@ -41,6 +44,11 @@ public class Edge {
             if (directed) {
                 drawArrowhead(g);
             }
+            // weight label at midpoint
+            int mx = (vertex1.location.x + vertex2.location.x) / 2;
+            int my = (vertex1.location.y + vertex2.location.y) / 2;
+            g.setColor(new Color(80, 80, 80));
+            g.drawString("" + weight, mx + 4, my - 4);
         }
     }
 
@@ -58,7 +66,7 @@ public class Edge {
     }
 
     public boolean hasIntersection(int x, int y) {
-        if (isSelfLoop()) return false;   // self-loops not clickable yet
+        if (isSelfLoop()) return false;
         int x1, x2, y1, y2;
         x1 = vertex1.location.x;
         x2 = vertex2.location.x;

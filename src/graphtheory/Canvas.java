@@ -29,6 +29,9 @@ public class Canvas {
     public int width,  height;
     private int clickedVertexIndex;
     private int clickedEdgeIndex;
+    private int pairedVertex1Index = -1;
+    private int pairedVertex2Index = -1;
+    private VertexPair currentPairVP = null;
     private FileManager fileManager = new FileManager();
 
     /////////////
@@ -83,6 +86,10 @@ public class Canvas {
         item.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_G, KeyEvent.CTRL_DOWN_MASK));
         item.addActionListener(new MenuListener());
         menuOptions.add(item);
+        item = new JMenuItem("Select Pair");
+        item.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_P, KeyEvent.CTRL_DOWN_MASK));
+        item.addActionListener(new MenuListener());
+        menuOptions.add(item);
         item = new JMenuItem("Remove Tool");
         item.addActionListener(new MenuListener());
         item.setEnabled(false);
@@ -135,6 +142,30 @@ public class Canvas {
                         Vertex v = new Vertex("" + vertexList.size(), e.getX(), e.getY());
                         vertexList.add(v);
                         v.draw(graphic);
+                        break;
+                    }
+                    case 6: {
+                        for (Vertex v : vertexList) {
+                            if (v.hasIntersection(e.getX(), e.getY())) {
+                                int idx = vertexList.indexOf(v);
+                                if (pairedVertex1Index == -1) {
+                                    pairedVertex1Index = idx;
+                                    v.wasClicked = true;
+                                } else if (pairedVertex2Index == -1 && idx != pairedVertex1Index) {
+                                    pairedVertex2Index = idx;
+                                    v.wasClicked = true;
+                                    currentPairVP = new VertexPair(vertexList.get(pairedVertex1Index), v);
+                                    currentPairVP.generateVertexDisjointPaths();
+                                } else {
+                                    if (pairedVertex1Index >= 0) vertexList.get(pairedVertex1Index).wasClicked = false;
+                                    if (pairedVertex2Index >= 0) vertexList.get(pairedVertex2Index).wasClicked = false;
+                                    pairedVertex1Index = idx;
+                                    pairedVertex2Index = -1;
+                                    currentPairVP = null;
+                                    v.wasClicked = true;
+                                }
+                            }
+                        }
                         break;
                     }
                     case 4: {
@@ -322,6 +353,11 @@ public class Canvas {
                 selectedTool = 4;
             } else if (command.equals("Add Directed Edge")) {
                 selectedTool = 5;
+            } else if (command.equals("Select Pair")) {
+                selectedTool = 6;
+                pairedVertex1Index = -1;
+                pairedVertex2Index = -1;
+                currentPairVP = null;
             } else if (command.equals("Mark as Root")) {
                 for (Vertex v : vertexList) {
                     if (v.wasClicked) {
@@ -336,6 +372,9 @@ public class Canvas {
                 edgeList.removeAllElements();
                 vertexList.removeAllElements();
                 clickedVertexIndex = 0;
+                pairedVertex1Index = -1;
+                pairedVertex2Index = -1;
+                currentPairVP = null;
                 erase();
             } else if (command.equals("Open File")) {
                 int returnValue = fileManager.jF.showOpenDialog(frame);
@@ -369,6 +408,7 @@ public class Canvas {
                     //distance
                     gP.generateDistanceMatrix(vertexList);
                     gP.computeCutpoints(vertexList);
+                    gP.computeBridges(vertexList, edgeList);
 
                     //VD paths
                     gP.displayContainers(vertexList);
@@ -492,6 +532,77 @@ public class Canvas {
         g.drawString("Root: " + clicked.isRoot,             x + 6, ty);
     }
 
+    private void drawPairInfoBox(Graphics g) {
+        if (currentPairVP == null) return;
+
+        Vertex v1 = currentPairVP.vertex1;
+        Vertex v2 = currentPairVP.vertex2;
+
+        // Adjacent: direct edge exists in either direction (respecting direction for directed)
+        boolean adjacent = false;
+        for (Edge e : edgeList) {
+            if ((e.vertex1 == v1 && e.vertex2 == v2) ||
+                (!e.directed && e.vertex1 == v2 && e.vertex2 == v1)) {
+                adjacent = true; break;
+            }
+        }
+
+        int dist = currentPairVP.getShortestDistance();
+        boolean reachable = dist != -1;
+        Vector<Vertex> geodesic = currentPairVP.getShortestPath();
+
+        // Build geodesic string (truncate if too long)
+        String geodesicStr = "";
+        if (geodesic != null) {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < geodesic.size(); i++) {
+                if (i > 0) sb.append("→");
+                sb.append(geodesic.get(i).name);
+            }
+            geodesicStr = sb.length() > 28 ? sb.substring(0, 25) + "..." : sb.toString();
+        }
+
+        // Simple paths (Walk without repeated vertices = Path)
+        int pathCount = currentPairVP.pathList != null ? currentPairVP.pathList.size() : 0;
+
+        // Max vertex-disjoint width
+        int maxWidth = 0;
+        if (currentPairVP.VertexDisjointContainer != null) {
+            for (Vector<Vector<Vertex>> c : currentPairVP.VertexDisjointContainer) {
+                if (c.size() > maxWidth) maxWidth = c.size();
+            }
+        }
+
+        // Ordered pair label
+        String pairLabel = v1.name + " → " + v2.name;
+
+        int x = 190, y = 10, w = 270, h = 178;
+        g.setColor(new Color(240, 248, 255));
+        g.fillRect(x, y, w, h);
+        g.setColor(Color.BLACK);
+        g.drawRect(x, y, w, h);
+
+        int ty = y + 15;
+        int lx = x + 6;
+        g.drawString("Ordered pair: (" + pairLabel + ")",          lx, ty); ty += 15;
+        g.drawString("Adjacent: " + adjacent,                      lx, ty); ty += 15;
+        g.drawString("Reachable: " + reachable,                    lx, ty); ty += 15;
+        g.drawString("Geodesic dist (Length): " + (reachable ? dist : "∞"), lx, ty); ty += 15;
+        if (!geodesicStr.isEmpty()) {
+            g.drawString("Geodesic path: " + geodesicStr,          lx, ty); ty += 15;
+        } else {
+            g.drawString("Geodesic path: N/A",                     lx, ty); ty += 15;
+        }
+        g.drawString("Simple paths (Walk∩no-repeat): " + pathCount, lx, ty); ty += 15;
+        g.drawString("Max vertex-disjoint width: " + maxWidth,     lx, ty); ty += 15;
+        // Closed: v1 == v2 (only meaningful if same vertex selected)
+        boolean closed = (v1 == v2);
+        g.drawString("Closed walk possible: " + closed,            lx, ty); ty += 15;
+        // Trail = walk with no repeated edges; path count >= 1 implies trails exist
+        g.drawString("Trail/Path exists: " + reachable,            lx, ty); ty += 15;
+        g.drawString("Tour (closed trail): " + closed,             lx, ty);
+    }
+
     private class CanvasPane extends JPanel {
 
         public void paint(Graphics g) {
@@ -502,6 +613,7 @@ public class Canvas {
                             "  Selected Tool=" + selectedTool, 50, height / 2 + (height * 2) / 5);
                     g.drawImage(canvasImage, 0, 0, null); //layer 1
                     drawInfoBox(g);
+                    drawPairInfoBox(g);
                     g.setColor(Color.black);
                     break;
                 }
@@ -510,6 +622,7 @@ public class Canvas {
                     gP.drawAdjacencyMatrix(canvasImage2.getGraphics(), vertexList, width / 2 + 50, 50);//draw adjacency matrix
                     gP.drawDistanceMatrix(canvasImage2.getGraphics(), vertexList, width / 2 + 50, height / 2 + 50);//draw distance matrix
                     gP.drawNodePropertiesTable(canvasImage2.getGraphics(), vertexList, 10, height / 2 + 70);
+                    gP.drawGraphSummary(canvasImage2.getGraphics(), vertexList, edgeList, width / 2 + 50, height - 110);
                     g.drawImage(canvasImage2, 0, 0, null); //layer 1
                     drawString("Graph disconnects when nodes in color red are removed.", 100, height - 30, 20);
                     g.drawString("See output console for Diameter of Graph", 100, height / 2 + 50);
