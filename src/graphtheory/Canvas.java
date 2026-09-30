@@ -40,7 +40,6 @@ public class Canvas {
     private GraphProperties gP = new GraphProperties();
     /////////////
 
-    /** When true, refresh() will recompute bridges and cutpoints. */
     private boolean graphDirty = true;
 
     public Canvas(String title, int width, int height, Color bgColour) {
@@ -93,13 +92,10 @@ public class Canvas {
         item.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_P, KeyEvent.CTRL_DOWN_MASK));
         item.addActionListener(new MenuListener());
         menuOptions.add(item);
-
-        // Remove Tool — enabled with shortcut
         item = new JMenuItem("Remove Tool");
         item.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_R, KeyEvent.CTRL_DOWN_MASK));
         item.addActionListener(new MenuListener());
         menuOptions.add(item);
-
         item = new JMenuItem("Auto Arrange Vertices");
         item.addActionListener(new MenuListener());
 
@@ -134,14 +130,8 @@ public class Canvas {
 
         vertexList = new Vector<Vertex>();
         edgeList = new Vector<Edge>();
-
     }
 
-    /**
-     * Single source of truth for hover state. Recomputes wasFocused / removeHover
-     * for every vertex and edge based on the given cursor position and the
-     * currently selected tool.
-     */
     private void updateHover(int mx, int my) {
         boolean removeMode = (selectedTool == 4);
 
@@ -163,7 +153,6 @@ public class Canvas {
         }
     }
 
-    /** Clears every hover flag. Used when the cursor leaves or the tool changes. */
     private void clearHover() {
         for (Vertex v : vertexList) {
             v.wasFocused  = false;
@@ -175,15 +164,10 @@ public class Canvas {
         }
     }
 
-    /** Mark the graph as structurally changed so bridges/cutpoints get recomputed. */
     private void markGraphDirty() {
         graphDirty = true;
     }
 
-    /**
-     * Recompute bridges and cutpoints if the graph has structurally changed
-     * since the last call. Cheap when graphDirty is false.
-     */
     private void recomputeGraphProperties() {
         if (!graphDirty) return;
         if (vertexList.size() > 0) {
@@ -200,7 +184,6 @@ public class Canvas {
 
         @Override
         public void mouseClicked(MouseEvent e) {
-
             if (selectedWindow == 0) {
                 switch (selectedTool) {
                     case 1: {
@@ -238,7 +221,6 @@ public class Canvas {
                         break;
                     }
                     case 4: {
-                        // ---------- 1) Try to remove a vertex ----------
                         Vertex victim = null;
                         for (Vertex v : vertexList) {
                             if (v.hasIntersection(e.getX(), e.getY())) {
@@ -283,7 +265,6 @@ public class Canvas {
                             break;
                         }
 
-                        // ---------- 2) Otherwise try to remove an edge ----------
                         Edge edgeVictim = null;
                         for (Edge ed : edgeList) {
                             if (ed.hasIntersection(e.getX(), e.getY())) {
@@ -371,7 +352,6 @@ public class Canvas {
                     }
                 }
             }
-
         }
 
         @Override
@@ -404,7 +384,6 @@ public class Canvas {
                         boolean addedAny = false;
                         for (Vertex v : vertexList) {
                             boolean alreadyThere = parentV.outNeighbors.contains(v);
-
                             if (v.hasIntersection(e.getX(), e.getY()) && !alreadyThere) {
                                 Edge edge = new Edge(parentV, v, true);
                                 parentV.outNeighbors.add(v);
@@ -421,7 +400,6 @@ public class Canvas {
                         break;
                     }
                     case 3: {
-                        // keep selection after release
                         break;
                     }
                 }
@@ -432,7 +410,6 @@ public class Canvas {
 
         @Override
         public void mouseDragged(MouseEvent e) {
-
             if (selectedWindow == 0 && vertexList.size() > 0) {
                 switch (selectedTool) {
                     case 2:
@@ -456,7 +433,6 @@ public class Canvas {
                 updateHover(e.getX(), e.getY());
                 refresh();
             }
-
         }
 
         @Override
@@ -533,9 +509,6 @@ public class Canvas {
                     reloadVertexConnections(matrix, vertexList);
 
                     gP.generateDistanceMatrix(vertexList);
-                    // computeCutpoints and computeBridges now run inside refresh()
-                    // via recomputeGraphProperties() when graphDirty is true.
-
                     gP.displayContainers(vertexList);
                 }
             }
@@ -545,7 +518,7 @@ public class Canvas {
     }
 
     private void arrangeVertices() {
-        if (vertexList.isEmpty()) return;   // guard against division by zero
+        if (vertexList.isEmpty()) return;
         double deg2rad = Math.PI / 180;
         double radius = height / 5;
         double centerX = width / 2;
@@ -584,10 +557,6 @@ public class Canvas {
         refresh();
     }
 
-    /**
-     * Rebuilds the off-screen buffer from scratch, then asks Swing to repaint.
-     * Also recomputes bridges/cutpoints if the graph is dirty.
-     */
     public void refresh() {
         recomputeGraphProperties();
         erase();
@@ -730,30 +699,46 @@ public class Canvas {
 
         public void paint(Graphics g) {
             switch (selectedWindow) {
-                case 0: {   //graph window
+                case 0: {
                     graphic.drawString("Vertex Count=" + vertexList.size() +
                             "  Edge Count=" + edgeList.size() +
                             "  Selected Tool=" + selectedTool, 50, height / 2 + (height * 2) / 5);
-                    g.drawImage(canvasImage, 0, 0, null); //layer 1
+                    g.drawImage(canvasImage, 0, 0, null);
                     drawInfoBox(g);
                     drawPairInfoBox(g);
                     g.setColor(Color.black);
                     break;
                 }
-                case 1: {   //properties window
-                    canvasImage2.getGraphics().clearRect(0, 0, width, height);
-                    gP.drawAdjacencyMatrix(canvasImage2.getGraphics(), vertexList, width / 2 + 50, 50);
-                    gP.drawDistanceMatrix(canvasImage2.getGraphics(), vertexList, width / 2 + 50, height / 2 + 50);
-                    gP.drawNodePropertiesTable(canvasImage2.getGraphics(), vertexList, 10, height / 2 + 70);
-                    gP.drawGraphSummary(canvasImage2.getGraphics(), vertexList, edgeList, width / 2 + 50, height - 110);
-                    g.drawImage(canvasImage2, 0, 0, null);
-                    drawString("Graph disconnects when nodes in color red are removed.", 100, height - 30, 20);
-                    g.drawString("See output console for Diameter of Graph", 100, height / 2 + 50);
-                    g.drawImage(canvasImage.getScaledInstance(width / 2, height / 2, Image.SCALE_SMOOTH), 0, 0, null);
-                    g.draw3DRect(0, 0, width / 2, height / 2, true);
-                    g.setColor(Color.black);
-                    break;
-                }
+                case 1: {
+    Graphics g2 = canvasImage2.getGraphics();
+    g2.clearRect(0, 0, width, height);
+
+    // ---- Right column: two matrices + summary ----
+    int rightX = width / 2 + 60;
+    int adjY = 50;
+    gP.drawAdjacencyMatrix(g2, vertexList, rightX, adjY);
+    int adjHeight = (vertexList.size() + 1) * 20 + 30;
+
+    int distY = adjY + adjHeight + 20;
+    gP.drawDistanceMatrix(g2, vertexList, rightX, distY);
+    int distHeight = (vertexList.size() + 1) * 20 + 30;
+
+    int summaryY = distY + distHeight + 20;
+    gP.drawGraphSummary(g2, vertexList, edgeList, rightX, summaryY);
+
+    // ---- Left column: node properties ----
+    gP.drawNodePropertiesTable(g2, vertexList, 10, height / 2 + 90);
+
+    // ---- Composite ----
+    g.drawImage(canvasImage2, 0, 0, null);
+    g.drawImage(canvasImage.getScaledInstance(width / 2, height / 2, Image.SCALE_SMOOTH),
+                0, 0, null);
+    g.draw3DRect(0, 0, width / 2, height / 2, true);
+
+    drawString("Graph disconnects when nodes in color red are removed.", 100, height - 30, 20);
+    g.setColor(Color.black);
+    break;
+}
             }
         }
     }

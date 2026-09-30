@@ -68,8 +68,6 @@ public class GraphProperties {
             kWideGraph[i] = -1;
         }
 
-
-
         VertexPair vp;
 
         for (int a = 0; a < vList.size(); a++) {    // assign vertex pairs
@@ -116,8 +114,6 @@ public class GraphProperties {
                 System.out.println("D" + i + "(G)=" + kWideGraph[i]);
             }
         }
-
-
     }
 
     public void drawAdjacencyMatrix(Graphics g, Vector<Vertex> vList, int x, int y) {
@@ -296,39 +292,84 @@ public class GraphProperties {
         return false;
     }
 
-    // ---- Graph summary panel ----
+    // ---- Graph summary (with Order / Size / Magnitude, and V/E sets) ----
 
-    public void drawGraphSummary(Graphics g, Vector<Vertex> vList, Vector<Edge> eList, int x, int y) {
-        int bridgeCount = 0;
-        for (Edge e : eList) { if (e.isBridge) bridgeCount++; }
+    /**
+ * Draws the graph summary box. Returns the total height in pixels,
+ * so callers can stack another panel directly below it.
+ */
+public int drawGraphSummary(Graphics g, Vector<Vertex> vList, Vector<Edge> eList, int x, int y) {
+    int bridgeCount = 0;
+    for (Edge e : eList) { if (e.isBridge) bridgeCount++; }
 
-        boolean eulerCircuit = hasEulerCircuit(vList);
-        boolean eulerPath    = hasEulerPath(vList);
-        boolean hamPath      = vList.size() <= 20 && hasHamiltonianPath(vList);
-        boolean hamCycle     = vList.size() <= 20 && hasHamiltonianCycle(vList);
-        boolean tooLarge     = vList.size() > 20;
+    boolean eulerCircuit = hasEulerCircuit(vList);
+    boolean eulerPath    = hasEulerPath(vList);
+    boolean hamPath      = vList.size() <= 20 && hasHamiltonianPath(vList);
+    boolean hamCycle     = vList.size() <= 20 && hasHamiltonianCycle(vList);
+    boolean tooLarge     = vList.size() > 20;
 
-        String[] lines = {
-            "Graph Summary",
-            "Bridges: " + bridgeCount + (bridgeCount > 0 ? " (purple edges)" : ""),
-            "Euler Circuit: " + (eulerCircuit ? "Yes" : "No"),
-            "Euler Path (Trail): " + (eulerPath ? "Yes" : "No"),
-            "Hamiltonian Path: " + (tooLarge ? ">20 vertices" : (hamPath ? "Yes" : "No")),
-            "Hamiltonian Cycle: " + (tooLarge ? ">20 vertices" : (hamCycle ? "Yes" : "No")),
-        };
+    int order     = vList.size();
+    int size      = eList.size();
+    int magnitude = order + size;
 
-        int rowH = 16;
-        int w = 240;
-        g.setColor(new Color(255, 255, 220));
-        g.fillRect(x, y - 14, w, lines.length * rowH + 6);
-        g.setColor(Color.BLACK);
-        g.drawRect(x, y - 14, w, lines.length * rowH + 6);
-        for (int i = 0; i < lines.length; i++) {
-            if (i == 0) g.setColor(new Color(60, 60, 60));
-            else        g.setColor(Color.BLACK);
-            g.drawString(lines[i], x + 4, y + i * rowH);
+    // ---- V line ----
+    StringBuilder vBody = new StringBuilder();
+    for (int i = 0; i < vList.size(); i++) {
+        if (i > 0) vBody.append(", ");
+        vBody.append(vList.get(i).name);
+    }
+    String vLine = "V = {" + vBody + "}" ;
+
+    // ---- E line, truncated to at most 6 edges ----
+    int maxEdgesShown = 6;
+    int shown = Math.min(size, maxEdgesShown);
+    StringBuilder eBody = new StringBuilder();
+    for (int i = 0; i < shown; i++) {
+        if (i > 0) eBody.append(", ");
+        Edge e = eList.get(i);
+        if (e.directed) {
+            eBody.append("(").append(e.vertex1.name).append(", ")
+                 .append(e.vertex2.name).append(")");
+        } else {
+            eBody.append("{").append(e.vertex1.name).append(", ")
+                 .append(e.vertex2.name).append("}");
         }
     }
+    if (size > maxEdgesShown) eBody.append(", ...");
+    String eLine = "E = {" + eBody + "}";
+
+    String[] lines = {
+        "Graph Summary",
+        "Order |V|: " + order,
+        "Size |E|: " + size,
+        "Magnitude |V|+|E|: " + magnitude,
+        "Bridges: " + bridgeCount + (bridgeCount > 0 ? " (purple)" : ""),
+        "Euler Circuit: " + (eulerCircuit ? "Yes" : "No"),
+        "Euler Path (Trail): " + (eulerPath ? "Yes" : "No"),
+        "Hamiltonian Path: " + (tooLarge ? ">20 vertices" : (hamPath ? "Yes" : "No")),
+        "Hamiltonian Cycle: " + (tooLarge ? ">20 vertices" : (hamCycle ? "Yes" : "No")),
+        vLine,
+        eLine,
+    };
+
+    int rowH = 16;
+    int w = 340;
+    int h = lines.length * rowH + 6;
+
+    g.setColor(new Color(255, 255, 220));
+    g.fillRect(x, y - 14, w, h);
+    g.setColor(Color.BLACK);
+    g.drawRect(x, y - 14, w, h);
+
+    for (int i = 0; i < lines.length; i++) {
+        if (i == 0) g.setColor(new Color(60, 60, 60));
+        else        g.setColor(Color.BLACK);
+        g.drawString(lines[i], x + 4, y + i * rowH);
+    }
+    return h;
+}
+
+    // ---- Cutpoints ----
 
     public void computeCutpoints(Vector<Vertex> vList) {
         int n = vList.size();
@@ -357,7 +398,7 @@ public class GraphProperties {
         int children = 0;
 
         for (int v : getAllNeighborIndices(u, vList)) {
-            if (v == u) continue;   // skip self-loops
+            if (v == u) continue;
             if (!visited[v]) {
                 children++;
                 parent[v] = u;
@@ -394,7 +435,6 @@ public class GraphProperties {
         Vector<Vertex> tempList = new Vector<Vertex>();
         Vector<Vertex> toBeRemoved = new Vector<Vertex>();
         Vertex victim;
-
 
         origList.setSize(vList.size());
         Collections.copy(origList, vList);
