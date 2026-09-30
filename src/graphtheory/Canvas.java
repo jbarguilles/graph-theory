@@ -42,6 +42,11 @@ public class Canvas {
 
     private boolean graphDirty = true;
 
+    // Build Walk tool (tool 7)
+    private Walk currentWalk = null;
+    private String walkMessage = null;
+    private static final Color WALK_COLOR = new Color(0, 150, 150);
+
     public Canvas(String title, int width, int height, Color bgColour) {
         frame = new JFrame();
         frame.setTitle(title);
@@ -51,6 +56,7 @@ public class Canvas {
         InputListener inputListener = new InputListener();
         canvas.addMouseListener(inputListener);
         canvas.addMouseMotionListener(inputListener);
+        installKeyBindings();
         frame.setContentPane(canvas);
 
         this.width = width;
@@ -94,6 +100,10 @@ public class Canvas {
         menuOptions.add(item);
         item = new JMenuItem("Remove Tool");
         item.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_R, KeyEvent.CTRL_DOWN_MASK));
+        item.addActionListener(new MenuListener());
+        menuOptions.add(item);
+        item = new JMenuItem("Build Walk");
+        item.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_W, KeyEvent.CTRL_DOWN_MASK));
         item.addActionListener(new MenuListener());
         menuOptions.add(item);
         item = new JMenuItem("Auto Arrange Vertices");
@@ -180,6 +190,91 @@ public class Canvas {
         graphDirty = false;
     }
 
+    private void clearWalk() {
+        currentWalk = null;
+        walkMessage = null;
+    }
+
+    private void installKeyBindings() {
+        InputMap im = canvas.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
+        ActionMap am = canvas.getActionMap();
+
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_BACK_SPACE, 0), "walkUndo");
+        am.put("walkUndo", new AbstractAction() {
+            public void actionPerformed(ActionEvent e) {
+                if (selectedTool == 7) { undoWalkStep(); refresh(); }
+            }
+        });
+
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "walkClear");
+        am.put("walkClear", new AbstractAction() {
+            public void actionPerformed(ActionEvent e) {
+                if (selectedTool == 7) { clearWalk(); refresh(); }
+            }
+        });
+    }
+
+    /** Removes the walk's last step; undoing a trivial walk clears it. */
+    private void undoWalkStep() {
+        walkMessage = null;
+        if (currentWalk != null && !currentWalk.undo()) currentWalk = null;
+    }
+
+    /** Tool 7 left-click: start the walk, or extend it by the clicked vertex or edge. */
+    private void handleWalkClick(int x, int y) {
+        Vertex hitV = null;
+        for (Vertex v : vertexList) {
+            if (v.hasIntersection(x, y)) { hitV = v; break; }
+        }
+        Edge hitE = null;
+        if (hitV == null) {
+            for (Edge ed : edgeList) {
+                if (ed.hasIntersection(x, y)) { hitE = ed; break; }
+            }
+        }
+        if (hitV == null && hitE == null) return;
+
+        if (currentWalk == null) {
+            if (hitV == null) {
+                walkMessage = "Click a vertex to start the walk";
+            } else {
+                currentWalk = new Walk(hitV);
+                walkMessage = null;
+            }
+            return;
+        }
+
+        Vertex end = currentWalk.end();
+        if (hitE != null) {
+            if (currentWalk.extend(hitE)) {
+                walkMessage = null;
+            } else {
+                walkMessage = "Edge " + Walk.edgeLabel(hitE, hitE.vertex1)
+                        + " can't be traversed from " + end.name;
+            }
+            return;
+        }
+
+        Vector<Edge> options = Walk.edgesBetween(end, hitV, edgeList);
+        if (options.isEmpty()) {
+            walkMessage = "No edge from " + end.name + " to " + hitV.name;
+        } else if (options.size() > 1) {
+            walkMessage = "Several edges from " + end.name + " to " + hitV.name
+                    + ": click the edge to use";
+        } else {
+            currentWalk.extend(options.get(0));
+            walkMessage = null;
+        }
+    }
+
+    private static String truncate(String s, int max) {
+        return s.length() > max ? s.substring(0, max - 3) + "..." : s;
+    }
+
+    private static String yesNo(boolean b) {
+        return b ? "yes" : "no";
+    }
+
     class InputListener implements MouseListener, MouseMotionListener {
 
         @Override
@@ -192,6 +287,15 @@ public class Canvas {
                         v.draw(graphic);
                         markGraphDirty();
                         updateHover(e.getX(), e.getY());
+                        refresh();
+                        break;
+                    }
+                    case 7: {
+                        if (SwingUtilities.isRightMouseButton(e)) {
+                            undoWalkStep();
+                        } else {
+                            handleWalkClick(e.getX(), e.getY());
+                        }
                         refresh();
                         break;
                     }
@@ -257,6 +361,7 @@ public class Canvas {
                                 currentPairVP = null;
                             }
 
+                            if (currentWalk != null && currentWalk.visits(victim)) clearWalk();
                             vertexList.remove(victim);
                             markGraphDirty();
 
@@ -284,6 +389,7 @@ public class Canvas {
                                 a.undirectedNeighbors.remove(b);
                                 b.undirectedNeighbors.remove(a);
                             }
+                            if (currentWalk != null && currentWalk.uses(edgeVictim)) clearWalk();
                             edgeList.remove(edgeVictim);
                             markGraphDirty();
 
@@ -466,6 +572,9 @@ public class Canvas {
                 pairedVertex1Index = -1;
                 pairedVertex2Index = -1;
                 currentPairVP = null;
+            } else if (command.equals("Build Walk")) {
+                selectedTool = 7;
+                clearWalk();
             } else if (command.equals("Mark as Root")) {
                 for (Vertex v : vertexList) {
                     if (v.wasClicked) {
@@ -481,10 +590,15 @@ public class Canvas {
                 pairedVertex1Index = -1;
                 pairedVertex2Index = -1;
                 currentPairVP = null;
+                clearWalk();
                 markGraphDirty();
             } else if (command.equals("Open File")) {
                 int returnValue = fileManager.jF.showOpenDialog(frame);
                 if (returnValue == JFileChooser.APPROVE_OPTION) {
+                    clearWalk();
+                    pairedVertex1Index = -1;
+                    pairedVertex2Index = -1;
+                    currentPairVP = null;
                     loadFile(fileManager.loadFile(fileManager.jF.getSelectedFile()));
                     System.out.println(fileManager.jF.getSelectedFile());
                     selectedWindow = 0;
@@ -559,6 +673,7 @@ public class Canvas {
 
     public void refresh() {
         recomputeGraphProperties();
+        applyHighlights();
         erase();
         for (Edge e : edgeList) {
             e.draw(graphic);
@@ -566,7 +681,41 @@ public class Canvas {
         for (Vertex v : vertexList) {
             v.draw(graphic);
         }
+        drawWalkMarkers(graphic);
         canvas.repaint();
+    }
+
+    /** Pushes the walk highlight and step labels onto the edges before drawing. */
+    private void applyHighlights() {
+        for (Edge ed : edgeList) {
+            ed.highlight = null;
+            ed.stepLabel = null;
+        }
+        if (currentWalk != null) {
+            for (Edge ed : currentWalk.edges()) {
+                ed.highlight = WALK_COLOR;
+                StringBuilder sb = new StringBuilder("#");
+                for (int step : currentWalk.stepsUsing(ed)) {
+                    if (sb.length() > 1) sb.append(",");
+                    sb.append(step);
+                }
+                ed.stepLabel = sb.toString();
+            }
+        }
+    }
+
+    private void drawWalkMarkers(Graphics g) {
+        if (currentWalk == null) return;
+        Vertex s = currentWalk.start();
+        Vertex t = currentWalk.end();
+        g.setColor(WALK_COLOR);
+        if (s == t) {
+            g.drawString("start/end", s.location.x - 24, s.location.y + 34);
+        } else {
+            g.drawString("start", s.location.x - 12, s.location.y + 34);
+            g.drawString("end", t.location.x - 9, t.location.y + 34);
+        }
+        g.setColor(Color.black);
     }
 
     public void setVisible(boolean visible) {
@@ -695,6 +844,36 @@ public class Canvas {
         g.drawString("Tour (closed trail): " + closed,             lx, ty);
     }
 
+    private void drawWalkInfoBox(Graphics g) {
+        if (currentWalk == null && walkMessage == null) return;
+
+        int x = 10, y = 420, w = 400, h = 95;
+        g.setColor(new Color(235, 250, 250));
+        g.fillRect(x, y, w, h);
+        g.setColor(Color.BLACK);
+        g.drawRect(x, y, w, h);
+
+        int ty = y + 16;
+        int lx = x + 6;
+        if (currentWalk == null) {
+            g.drawString("Walk: (none)", lx, ty); ty += 16;
+        } else {
+            Walk w0 = currentWalk;
+            g.drawString("Walk: " + truncate(w0.toString(), 60), lx, ty); ty += 16;
+            g.drawString("Length: " + w0.length(), lx, ty); ty += 16;
+            g.drawString("Trail: " + yesNo(w0.isTrail())
+                    + "   Path: " + yesNo(w0.isPath()), lx, ty); ty += 16;
+            g.drawString("Closed: " + yesNo(w0.isClosed())
+                    + "   Circuit: " + yesNo(w0.isCircuit())
+                    + "   Cycle: " + yesNo(w0.isCycle()), lx, ty); ty += 16;
+        }
+        if (walkMessage != null) {
+            g.setColor(new Color(200, 0, 0));
+            g.drawString(walkMessage, lx, ty);
+            g.setColor(Color.BLACK);
+        }
+    }
+
     private class CanvasPane extends JPanel {
 
         public void paint(Graphics g) {
@@ -706,6 +885,7 @@ public class Canvas {
                     g.drawImage(canvasImage, 0, 0, null);
                     drawInfoBox(g);
                     drawPairInfoBox(g);
+                    drawWalkInfoBox(g);
                     g.setColor(Color.black);
                     break;
                 }
