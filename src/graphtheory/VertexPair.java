@@ -85,7 +85,8 @@ public class VertexPair {
     /**
      * All paths from vertex1 to vertex2 as edge-aware walks, shortest first.
      * Paths with the same vertices but different parallel edges are listed
-     * separately (ADR 0002).
+     * separately (ADR 0002). If vertex1 == vertex2 the result is the single
+     * trivial walk.
      */
     public Vector<Walk> generateEdgePaths(Vector<Edge> eList) {
         Vector<Walk> result = new Vector<Walk>();
@@ -174,8 +175,8 @@ public class VertexPair {
             Vector<Vertex> Path = new Vector<Vertex>();
             Path.setSize(visitedNodes.size());
             Collections.copy(Path, visitedNodes);
-            // Parallel edges can reach the same vertex twice; the width is
-            // vertex-based, so keep each vertex sequence once (ADR 0002).
+            // A neighbour can appear in more than one neighbour list (e.g. {u,v} and (u,v));
+            // the width is vertex-based, so keep each vertex sequence once (ADR 0002).
             if (pathList.contains(Path)) return;
             pathList.add(Path);
             for (Vertex a : Path) {

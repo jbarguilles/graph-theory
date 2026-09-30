@@ -39,6 +39,21 @@ public class VertexPairTest {
         assertEquals(1, paths.get(0).length());
         assertEquals(1, paths.get(1).length());
         assertNotSame(paths.get(0).edges().get(0), paths.get(1).edges().get(0));
+        java.util.List<Edge> firsts = Arrays.asList(
+                paths.get(0).edges().get(0), paths.get(1).edges().get(0));
+        assertTrue(firsts.contains(undUV));
+        assertTrue(firsts.contains(arcUV));
+    }
+
+    @Test
+    public void edgePaths_antiparallelArcs_onlyForwardArcUsed() {
+        Edge forward = arc(u, v);
+        Edge backward = arc(v, u);
+        Vector<Walk> paths = new VertexPair(u, v).generateEdgePaths(edges(forward, backward));
+
+        assertEquals(1, paths.size());
+        assertEquals(1, paths.get(0).length());
+        assertSame(forward, paths.get(0).edges().get(0));
     }
 
     @Test
