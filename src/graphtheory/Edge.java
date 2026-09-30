@@ -20,6 +20,11 @@ public class Edge {
     // Set by Canvas when the Remove Tool hovers over this edge.
     public boolean removeHover = false;
 
+    // Set by Canvas before drawing when this edge is on the built walk or the
+    // highlighted pair path. null = not highlighted / no label.
+    public Color highlight = null;
+    public String stepLabel = null;
+
     private static final int VERTEX_RADIUS = 15;
     private static final int ARROW_SIZE = 12;
 
@@ -54,6 +59,8 @@ public class Edge {
             g.setColor(Color.red);
         } else if (wasFocused) {
             g.setColor(Color.blue);
+        } else if (highlight != null) {
+            g.setColor(highlight);
         } else if (isBridge) {
             g.setColor(new Color(150, 0, 200));
         } else {
@@ -79,6 +86,7 @@ public class Edge {
 
             g.setColor(new Color(80, 80, 80));
             g.drawString("" + weight, lx + 18, ly - 28);
+            drawStepLabel(g, lx + 18, ly - 14);
             return;
         }
 
@@ -107,7 +115,7 @@ public class Edge {
         double ctrlX = mx + (perpX / perpLen) * curveOffset;
         double ctrlY = my + (perpY / perpLen) * curveOffset;
 
-        if (removeHover && g instanceof Graphics2D) {
+        if ((removeHover || highlight != null) && g instanceof Graphics2D) {
             Graphics2D g2 = (Graphics2D) g;
             Stroke old = g2.getStroke();
             g2.setStroke(new BasicStroke(3.0f));
@@ -128,6 +136,14 @@ public class Edge {
         int midY = (int) ((startY + 2 * ctrlY + endY) / 4.0);
         g.setColor(new Color(80, 80, 80));
         g.drawString("" + weight, midX + 4, midY - 4);
+        drawStepLabel(g, midX + 4, midY + 12);
+    }
+
+    /** Draws the walk step numbers (e.g. "#1,4") under the weight label. */
+    private void drawStepLabel(Graphics g, int x, int y) {
+        if (stepLabel == null) return;
+        g.setColor(highlight != null ? highlight : Color.black);
+        g.drawString(stepLabel, x, y);
     }
 
     /** Draws a quadratic Bezier, falling back to a straight line if flat. */
