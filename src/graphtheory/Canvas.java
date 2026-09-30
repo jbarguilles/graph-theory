@@ -90,10 +90,13 @@ public class Canvas {
         item.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_P, KeyEvent.CTRL_DOWN_MASK));
         item.addActionListener(new MenuListener());
         menuOptions.add(item);
+
+        // Remove Tool — enabled with shortcut
         item = new JMenuItem("Remove Tool");
+        item.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_R, KeyEvent.CTRL_DOWN_MASK));
         item.addActionListener(new MenuListener());
-        item.setEnabled(false);
         menuOptions.add(item);
+
         item = new JMenuItem("Auto Arrange Vertices");
         item.addActionListener(new MenuListener());
 
@@ -131,6 +134,46 @@ public class Canvas {
 
     }
 
+    /**
+     * Single source of truth for hover state. Recomputes wasFocused / removeHover
+     * for every vertex and edge based on the given cursor position and the
+     * currently selected tool.
+     */
+    private void updateHover(int mx, int my) {
+        boolean removeMode = (selectedTool == 4);
+
+        // Which vertex (if any) is hovered? At most one.
+        Vertex hoveredVertex = null;
+        for (Vertex v : vertexList) {
+            if (v.hasIntersection(mx, my)) { hoveredVertex = v; break; }
+        }
+
+        for (Vertex v : vertexList) {
+            boolean hit = (v == hoveredVertex);
+            v.wasFocused  = hit;
+            v.removeHover = removeMode && hit;
+        }
+
+        for (Edge d : edgeList) {
+            // Vertex has priority in Remove Tool — suppress edge hover when a vertex is hovered.
+            boolean hit = (hoveredVertex == null) && d.hasIntersection(mx, my);
+            d.wasFocused  = hit;
+            d.removeHover = removeMode && hit;
+        }
+    }
+
+    /** Clears every hover flag. Used when the cursor leaves or the tool changes. */
+    private void clearHover() {
+        for (Vertex v : vertexList) {
+            v.wasFocused  = false;
+            v.removeHover = false;
+        }
+        for (Edge ed : edgeList) {
+            ed.wasFocused  = false;
+            ed.removeHover = false;
+        }
+    }
+
     class InputListener implements MouseListener, MouseMotionListener {
 
         @Override
@@ -142,6 +185,9 @@ public class Canvas {
                         Vertex v = new Vertex("" + vertexList.size(), e.getX(), e.getY());
                         vertexList.add(v);
                         v.draw(graphic);
+                        // A brand-new vertex can't be hovered at the old position;
+                        // recompute hover based on the current click position.
+                        updateHover(e.getX(), e.getY());
                         break;
                     }
                     case 6: {
@@ -169,38 +215,102 @@ public class Canvas {
                         break;
                     }
                     case 4: {
+                        // ---------- 1) Try to remove a vertex ----------
+                        Vertex victim = null;
+                        for (Vertex v : vertexList) {
+                            if (v.hasIntersection(e.getX(), e.getY())) {
+                                victim = v;
+                                break;
+                            }
+                        }
 
-                        /* for (Vertex v : vertexList) {
-                        if (v.hasIntersection(e.getX(), e.getY())) {
-                        {
-                        for (Edge d : edgeList) {
-                        if (d.vertex1 == v || d.vertex2 == v) {
-                        edgeList.remove(d);
+                        if (victim != null) {
+                            // Remove every edge touching this vertex
+                            Vector<Edge> toRemove = new Vector<Edge>();
+                            for (Edge ed : edgeList) {
+                                if (ed.vertex1 == victim || ed.vertex2 == victim) {
+                                    toRemove.add(ed);
+                                }
+                            }
+                            edgeList.removeAll(toRemove);
+
+                            // Clean up neighbor lists on every remaining vertex
+                            for (Vertex v : vertexList) {
+                                v.undirectedNeighbors.remove(victim);
+                                v.inNeighbors.remove(victim);
+                                v.outNeighbors.remove(victim);
+                            }
+
+                            // Reset pair selection if it referenced the removed vertex
+                            if (pairedVertex1Index >= 0
+                                    && vertexList.get(pairedVertex1Index) == victim) {
+                                pairedVertex1Index = -1;
+                            }
+                            if (pairedVertex2Index >= 0
+                                    && vertexList.get(pairedVertex2Index) == victim) {
+                                pairedVertex2Index = -1;
+                            }
+                            if (currentPairVP != null
+                                    && (currentPairVP.vertex1 == victim || currentPairVP.vertex2 == victim)) {
+                                currentPairVP = null;
+                            }
+
+                            vertexList.remove(victim);
+
+                            // Recompute hover for the new graph state at the click position.
+                            updateHover(e.getX(), e.getY());
+
+                            erase();
+                            refresh();
+                            break;
                         }
+
+                        // ---------- 2) Otherwise try to remove an edge ----------
+                        Edge edgeVictim = null;
+                        for (Edge ed : edgeList) {
+                            if (ed.hasIntersection(e.getX(), e.getY())) {
+                                edgeVictim = ed;
+                                break;
+                            }
                         }
-                        for (Vertex x : vertexList) {
-                        if (x.connectedToVertex(v)) {
-                        x.undirectedNeighbors.remove(v);
+
+                        if (edgeVictim != null) {
+                            Vertex a = edgeVictim.vertex1;
+                            Vertex b = edgeVictim.vertex2;
+
+                            if (edgeVictim.directed) {
+                                a.outNeighbors.remove(b);
+                                b.inNeighbors.remove(a);
+                            } else {
+                                a.undirectedNeighbors.remove(b);
+                                b.undirectedNeighbors.remove(a);
+                            }
+                            edgeList.remove(edgeVictim);
+
+                            // Recompute hover for the new graph state at the click position.
+                            updateHover(e.getX(), e.getY());
+
+                            erase();
+                            refresh();
                         }
-                        }
-                        vertexList.remove(v);
-                        }
-                        }
-                        }*/ break;
+                        break;
                     }
                 }
-            //refresh();
             }
-
-
         }
 
         @Override
         public void mouseEntered(MouseEvent e) {
+            if (selectedWindow == 0) {
+                updateHover(e.getX(), e.getY());
+                refresh();
+            }
         }
 
         @Override
         public void mouseExited(MouseEvent e) {
+            clearHover();
+            refresh();
         }
 
         @Override
@@ -286,6 +396,8 @@ public class Canvas {
                     }
                 }
             }
+            // After any release, refresh hover from current cursor position.
+            updateHover(e.getX(), e.getY());
             erase();
             refresh();
         }
@@ -299,7 +411,9 @@ public class Canvas {
                     case 2:
                     case 5: {
                         graphic.setColor(Color.RED);
-                        drawLine(vertexList.get(clickedVertexIndex).location.x, vertexList.get(clickedVertexIndex).location.y, e.getX(), e.getY());
+                        drawLine(vertexList.get(clickedVertexIndex).location.x,
+                                 vertexList.get(clickedVertexIndex).location.y,
+                                 e.getX(), e.getY());
                         break;
 
                     }
@@ -311,6 +425,8 @@ public class Canvas {
                         break;
                     }
                 }
+                // While dragging a vertex, hover state must follow it.
+                updateHover(e.getX(), e.getY());
                 refresh();
             }
 
@@ -319,23 +435,9 @@ public class Canvas {
         @Override
         public void mouseMoved(MouseEvent e) {
             if (selectedWindow == 0) {
-                for (Edge d : edgeList) {
-                    if (d.hasIntersection(e.getX(), e.getY())) {
-                        d.wasFocused = true;
-                    } else {
-                        d.wasFocused = false;
-                    }
-                }
-                for (Vertex v : vertexList) {
-                    if (v.hasIntersection(e.getX(), e.getY())) {
-                        v.wasFocused = true;
-                    } else {
-                        v.wasFocused = false;
-                    }
-                }
+                updateHover(e.getX(), e.getY());
                 refresh();
             }
-
         }
     }
 
@@ -343,6 +445,10 @@ public class Canvas {
 
         public void actionPerformed(ActionEvent e) {
             String command = e.getActionCommand();
+
+            // Any tool/menu action clears the "about to be removed" preview.
+            clearHover();
+
             if (command.equals("Add Vertex")) {
                 selectedTool = 1;
             } else if (command.equals("Add Edges")) {
@@ -381,12 +487,12 @@ public class Canvas {
                 if (returnValue == JFileChooser.APPROVE_OPTION) {
                     loadFile(fileManager.loadFile(fileManager.jF.getSelectedFile()));
                     System.out.println(fileManager.jF.getSelectedFile());
-                    selectedWindow=0;
+                    selectedWindow = 0;
                 }
             } else if (command.equals("Save to File")) {
                 int returnValue = fileManager.jF.showSaveDialog(frame);
                 if (returnValue == JFileChooser.APPROVE_OPTION) {
-                    fileManager.saveFile(vertexList,fileManager.jF.getSelectedFile());
+                    fileManager.saveFile(vertexList, fileManager.jF.getSelectedFile());
                     System.out.println(fileManager.jF.getSelectedFile());
                 }
             } else if (command.equals("Graph")) {
@@ -412,7 +518,7 @@ public class Canvas {
 
                     //VD paths
                     gP.displayContainers(vertexList);
-                //gP.drawNWideDiameter();
+                    //gP.drawNWideDiameter();
                 }
                 erase();
             }
@@ -463,15 +569,15 @@ public class Canvas {
     }
 
     public void refresh() {
-        for (Edge e : edgeList) {
-            e.draw(graphic);
-        }
-        for (Vertex v : vertexList) {
-            v.draw(graphic);
-        }
-
-        canvas.repaint();
+    erase();                       // <-- clear the buffer first
+    for (Edge e : edgeList) {
+        e.draw(graphic);
     }
+    for (Vertex v : vertexList) {
+        v.draw(graphic);
+    }
+    canvas.repaint();
+}
 
     public void setVisible(boolean visible) {
         if (graphic == null) {
@@ -637,4 +743,3 @@ public class Canvas {
         }
     }
 }
-

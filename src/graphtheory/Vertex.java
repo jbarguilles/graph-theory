@@ -19,6 +19,8 @@ public class Vertex implements Comparable {
     public Point location;
     public boolean wasFocused;
     public boolean wasClicked;
+    public boolean removeHover;   // red preview when Remove Tool hovers
+
     private int size1 = 30;
     private int size2 = 40;
     public Vector<Vertex> undirectedNeighbors;
@@ -41,12 +43,7 @@ public class Vertex implements Comparable {
 
     public boolean hasIntersection(int x, int y) {
         double distance = Math.sqrt(Math.pow((x - location.x), 2) + Math.pow((y - location.y), 2));
-
-        if (distance > size2 / 2) {
-            return false;
-        } else {
-            return true;
-        }
+        return distance <= size2 / 2;
     }
 
     public boolean connectedToVertex(Vertex v) {
@@ -91,7 +88,10 @@ public class Vertex implements Comparable {
 
     public void draw(Graphics g) {
         // Draw property ring behind the vertex circle
-        if (isRoot) {
+        if (removeHover) {
+            g.setColor(new Color(220, 0, 0));
+            g.fillOval(location.x - size2 / 2 - 6, location.y - size2 / 2 - 6, size2 + 12, size2 + 12);
+        } else if (isRoot) {
             g.setColor(new Color(0, 180, 0));
             g.fillOval(location.x - size2 / 2 - 4, location.y - size2 / 2 - 4, size2 + 8, size2 + 8);
         } else if (isCutpoint) {

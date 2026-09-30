@@ -1,8 +1,8 @@
 package graphtheory;
 
-import javax.swing.UIManager;
 import java.awt.Color;
 import java.util.Date;
+import javax.swing.UIManager;
 
 public class Main {
 
