@@ -881,7 +881,7 @@ public class Canvas {
         g.drawString("Ordered pair: (" + pairLabel + ")",          lx, ty); ty += 15;
         g.drawString("Adjacent: " + adjacent,                      lx, ty); ty += 15;
         g.drawString("Reachable: " + reachable,                    lx, ty); ty += 15;
-        g.drawString("Geodesic dist (Length): " + (reachable ? dist : "∞"), lx, ty); ty += 15;
+        g.drawString("Distance: " + (reachable ? dist : "∞"), lx, ty); ty += 15;
         if (!geodesicStr.isEmpty()) {
             g.drawString("Geodesic path: " + geodesicStr,          lx, ty); ty += 15;
         } else {
@@ -900,13 +900,13 @@ public class Canvas {
         int first = (selectedPathIndex / PATH_ROWS) * PATH_ROWS;
         for (int i = first; i < Math.min(first + PATH_ROWS, pathCount); i++) {
             Walk p = pairPaths.get(i);
-            if (i == selectedPathIndex) {
+            if (i == selectedPathIndex && selectedTool == 6) {
                 g.setColor(new Color(255, 230, 160));
                 g.fillRect(x + 2, ty - 12, w - 4, 15);
                 g.setColor(Color.BLACK);
             }
-            String row = (i + 1) + ". " + truncate(p.toString(), 34)
-                    + "   length " + p.length()
+            String row = (i + 1) + ". " + truncate(p.toString(), 40)
+                    + "  len " + p.length()
                     + (p.length() == minLen ? "  ← geodesic" : "");
             g.drawString(row, lx, ty);
             ty += 15;
