@@ -40,6 +40,9 @@ public class Canvas {
     private GraphProperties gP = new GraphProperties();
     /////////////
 
+    /** When true, refresh() will recompute bridges and cutpoints. */
+    private boolean graphDirty = true;
+
     public Canvas(String title, int width, int height, Color bgColour) {
         frame = new JFrame();
         frame.setTitle(title);
@@ -134,6 +137,11 @@ public class Canvas {
 
     }
 
+    /**
+     * Single source of truth for hover state. Recomputes wasFocused / removeHover
+     * for every vertex and edge based on the given cursor position and the
+     * currently selected tool.
+     */
     private void updateHover(int mx, int my) {
         boolean removeMode = (selectedTool == 4);
 
@@ -155,6 +163,7 @@ public class Canvas {
         }
     }
 
+    /** Clears every hover flag. Used when the cursor leaves or the tool changes. */
     private void clearHover() {
         for (Vertex v : vertexList) {
             v.wasFocused  = false;
@@ -164,6 +173,27 @@ public class Canvas {
             ed.wasFocused  = false;
             ed.removeHover = false;
         }
+    }
+
+    /** Mark the graph as structurally changed so bridges/cutpoints get recomputed. */
+    private void markGraphDirty() {
+        graphDirty = true;
+    }
+
+    /**
+     * Recompute bridges and cutpoints if the graph has structurally changed
+     * since the last call. Cheap when graphDirty is false.
+     */
+    private void recomputeGraphProperties() {
+        if (!graphDirty) return;
+        if (vertexList.size() > 0) {
+            gP.computeCutpoints(vertexList);
+            gP.computeBridges(vertexList, edgeList);
+        } else {
+            for (Vertex v : vertexList) v.isCutpoint = false;
+            for (Edge e : edgeList)   e.isBridge   = false;
+        }
+        graphDirty = false;
     }
 
     class InputListener implements MouseListener, MouseMotionListener {
@@ -177,7 +207,9 @@ public class Canvas {
                         Vertex v = new Vertex("" + vertexList.size(), e.getX(), e.getY());
                         vertexList.add(v);
                         v.draw(graphic);
+                        markGraphDirty();
                         updateHover(e.getX(), e.getY());
+                        refresh();
                         break;
                     }
                     case 6: {
@@ -202,6 +234,7 @@ public class Canvas {
                                 }
                             }
                         }
+                        refresh();
                         break;
                     }
                     case 4: {
@@ -243,6 +276,7 @@ public class Canvas {
                             }
 
                             vertexList.remove(victim);
+                            markGraphDirty();
 
                             updateHover(e.getX(), e.getY());
                             refresh();
@@ -270,6 +304,7 @@ public class Canvas {
                                 b.undirectedNeighbors.remove(a);
                             }
                             edgeList.remove(edgeVictim);
+                            markGraphDirty();
 
                             updateHover(e.getX(), e.getY());
                             refresh();
@@ -345,6 +380,7 @@ public class Canvas {
                 switch (selectedTool) {
                     case 2: {
                         Vertex parentV = vertexList.get(clickedVertexIndex);
+                        boolean addedAny = false;
                         for (Vertex v : vertexList) {
                             if (v.hasIntersection(e.getX(), e.getY()) && !v.connectedToVertex(parentV)) {
                                 Edge edge = new Edge(v, parentV, false);
@@ -355,14 +391,17 @@ public class Canvas {
                                 v.wasClicked = false;
                                 parentV.wasClicked = false;
                                 edgeList.add(edge);
+                                addedAny = true;
                             } else {
                                 v.wasClicked = false;
                             }
                         }
+                        if (addedAny) markGraphDirty();
                         break;
                     }
                     case 5: {
                         Vertex parentV = vertexList.get(clickedVertexIndex);
+                        boolean addedAny = false;
                         for (Vertex v : vertexList) {
                             boolean alreadyThere = parentV.outNeighbors.contains(v);
 
@@ -373,14 +412,16 @@ public class Canvas {
                                 parentV.wasClicked = false;
                                 v.wasClicked = false;
                                 edgeList.add(edge);
+                                addedAny = true;
                             } else {
                                 v.wasClicked = false;
                             }
                         }
+                        if (addedAny) markGraphDirty();
                         break;
                     }
                     case 3: {
-                        // keep selection; do not clear
+                        // keep selection after release
                         break;
                     }
                 }
@@ -464,6 +505,7 @@ public class Canvas {
                 pairedVertex1Index = -1;
                 pairedVertex2Index = -1;
                 currentPairVP = null;
+                markGraphDirty();
             } else if (command.equals("Open File")) {
                 int returnValue = fileManager.jF.showOpenDialog(frame);
                 if (returnValue == JFileChooser.APPROVE_OPTION) {
@@ -491,8 +533,8 @@ public class Canvas {
                     reloadVertexConnections(matrix, vertexList);
 
                     gP.generateDistanceMatrix(vertexList);
-                    gP.computeCutpoints(vertexList);
-                    gP.computeBridges(vertexList, edgeList);
+                    // computeCutpoints and computeBridges now run inside refresh()
+                    // via recomputeGraphProperties() when graphDirty is true.
 
                     gP.displayContainers(vertexList);
                 }
@@ -503,6 +545,7 @@ public class Canvas {
     }
 
     private void arrangeVertices() {
+        if (vertexList.isEmpty()) return;   // guard against division by zero
         double deg2rad = Math.PI / 180;
         double radius = height / 5;
         double centerX = width / 2;
@@ -537,10 +580,16 @@ public class Canvas {
     private void loadFile(Vector<Vector> File) {
         vertexList = File.firstElement();
         edgeList = File.lastElement();
+        markGraphDirty();
         refresh();
     }
 
+    /**
+     * Rebuilds the off-screen buffer from scratch, then asks Swing to repaint.
+     * Also recomputes bridges/cutpoints if the graph is dirty.
+     */
     public void refresh() {
+        recomputeGraphProperties();
         erase();
         for (Edge e : edgeList) {
             e.draw(graphic);
