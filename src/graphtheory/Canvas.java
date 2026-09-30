@@ -134,15 +134,9 @@ public class Canvas {
 
     }
 
-    /**
-     * Single source of truth for hover state. Recomputes wasFocused / removeHover
-     * for every vertex and edge based on the given cursor position and the
-     * currently selected tool.
-     */
     private void updateHover(int mx, int my) {
         boolean removeMode = (selectedTool == 4);
 
-        // Which vertex (if any) is hovered? At most one.
         Vertex hoveredVertex = null;
         for (Vertex v : vertexList) {
             if (v.hasIntersection(mx, my)) { hoveredVertex = v; break; }
@@ -155,14 +149,12 @@ public class Canvas {
         }
 
         for (Edge d : edgeList) {
-            // Vertex has priority in Remove Tool — suppress edge hover when a vertex is hovered.
             boolean hit = (hoveredVertex == null) && d.hasIntersection(mx, my);
             d.wasFocused  = hit;
             d.removeHover = removeMode && hit;
         }
     }
 
-    /** Clears every hover flag. Used when the cursor leaves or the tool changes. */
     private void clearHover() {
         for (Vertex v : vertexList) {
             v.wasFocused  = false;
@@ -223,7 +215,6 @@ public class Canvas {
                         }
 
                         if (victim != null) {
-                            // Remove every edge touching this vertex
                             Vector<Edge> toRemove = new Vector<Edge>();
                             for (Edge ed : edgeList) {
                                 if (ed.vertex1 == victim || ed.vertex2 == victim) {
@@ -232,14 +223,12 @@ public class Canvas {
                             }
                             edgeList.removeAll(toRemove);
 
-                            // Clean up neighbor lists on every remaining vertex
                             for (Vertex v : vertexList) {
                                 v.undirectedNeighbors.remove(victim);
                                 v.inNeighbors.remove(victim);
                                 v.outNeighbors.remove(victim);
                             }
 
-                            // Reset pair selection if it referenced the removed vertex
                             if (pairedVertex1Index >= 0
                                     && vertexList.get(pairedVertex1Index) == victim) {
                                 pairedVertex1Index = -1;
@@ -322,7 +311,6 @@ public class Canvas {
                         break;
                     }
                     case 3: {
-                        // Clear any previous selection so only one vertex is selected.
                         for (Vertex v : vertexList) {
                             v.wasClicked = false;
                         }
@@ -342,8 +330,6 @@ public class Canvas {
                             }
                         }
 
-                        // Repaint now so the info box appears on the very first
-                        // click — before any drag happens.
                         updateHover(e.getX(), e.getY());
                         refresh();
                         break;
@@ -364,7 +350,6 @@ public class Canvas {
                                 Edge edge = new Edge(v, parentV, false);
                                 v.addUndirectedNeighbor(parentV);
                                 if (v != parentV) {
-                                    // For a self-loop, only add the entry once.
                                     parentV.addUndirectedNeighbor(v);
                                 }
                                 v.wasClicked = false;
@@ -379,7 +364,9 @@ public class Canvas {
                     case 5: {
                         Vertex parentV = vertexList.get(clickedVertexIndex);
                         for (Vertex v : vertexList) {
-                            if (v.hasIntersection(e.getX(), e.getY()) && !v.connectedToVertex(parentV)) {
+                            boolean alreadyThere = parentV.outNeighbors.contains(v);
+
+                            if (v.hasIntersection(e.getX(), e.getY()) && !alreadyThere) {
                                 Edge edge = new Edge(parentV, v, true);
                                 parentV.outNeighbors.add(v);
                                 v.inNeighbors.add(parentV);
@@ -393,8 +380,7 @@ public class Canvas {
                         break;
                     }
                     case 3: {
-                        // Keep the vertex selected after release so the info
-                        // box stays visible. Do NOT clear wasClicked here.
+                        // keep selection; do not clear
                         break;
                     }
                 }
@@ -410,7 +396,6 @@ public class Canvas {
                 switch (selectedTool) {
                     case 2:
                     case 5: {
-                        // Draw the rubber-band line on top of a fresh redraw.
                         refresh();
                         graphic.setColor(Color.RED);
                         drawLine(vertexList.get(clickedVertexIndex).location.x,
@@ -555,12 +540,6 @@ public class Canvas {
         refresh();
     }
 
-    /**
-     * Rebuilds the off-screen buffer from scratch, then asks Swing to repaint.
-     * Calling erase() first is essential: without it, hover highlights that
-     * were drawn in a previous frame would still be visible under the new
-     * (thinner) strokes.
-     */
     public void refresh() {
         erase();
         for (Edge e : edgeList) {

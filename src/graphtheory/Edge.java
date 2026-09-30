@@ -25,6 +25,9 @@ public class Edge {
 
     public static final double TOLERANCE = 6.0;
 
+    /** Perpendicular offset (in pixels) used to separate antiparallel arcs. */
+    private static final int CURVE_OFFSET = 16;
+
     public Edge(Vertex v1, Vertex v2, boolean directed) {
         vertex1 = v1;
         vertex2 = v2;
@@ -33,6 +36,15 @@ public class Edge {
 
     public boolean isSelfLoop() {
         return vertex1 == vertex2;
+    }
+
+    /** True if a reverse directed edge vertex2 → vertex1 also exists. */
+    private boolean hasReverseArc() {
+        if (!directed || isSelfLoop()) return false;
+        for (Vertex n : vertex2.outNeighbors) {
+            if (n == vertex1) return true;
+        }
+        return false;
     }
 
     public void draw(Graphics g) {
@@ -60,8 +72,6 @@ public class Edge {
             g.drawOval(ovalX, ovalY, ovalW, ovalH);
 
             if (directed) {
-                // Tip sits on the top of the oval, just right of top-center.
-                // Tangent at the top of an oval (reading clockwise) points to +x.
                 int tipX = ovalX + ovalW / 2 + 4;
                 int tipY = ovalY;
                 drawArrowhead(g, tipX, tipY, 0.0, 8);
@@ -82,24 +92,63 @@ public class Edge {
         int endX   = (int) (x2 - VERTEX_RADIUS * Math.cos(angle));
         int endY   = (int) (y2 - VERTEX_RADIUS * Math.sin(angle));
 
+        boolean hasReverse = hasReverseArc();
+
+        // Control point: midpoint shifted perpendicular to travel direction
+        // when a reverse arc exists. Zero offset → straight line.
+        double mx = (startX + endX) / 2.0;
+        double my = (startY + endY) / 2.0;
+        double perpX = -(endY - startY);
+        double perpY =  (endX - startX);
+        double perpLen = Math.hypot(perpX, perpY);
+        if (perpLen == 0) perpLen = 1;
+
+        int curveOffset = hasReverse ? CURVE_OFFSET : 0;
+        double ctrlX = mx + (perpX / perpLen) * curveOffset;
+        double ctrlY = my + (perpY / perpLen) * curveOffset;
+
         if (removeHover && g instanceof Graphics2D) {
             Graphics2D g2 = (Graphics2D) g;
             Stroke old = g2.getStroke();
             g2.setStroke(new BasicStroke(3.0f));
-            g2.drawLine(startX, startY, endX, endY);
+            drawQuadCurve(g2, startX, startY, (int) ctrlX, (int) ctrlY, endX, endY);
             g2.setStroke(old);
         } else {
-            g.drawLine(startX, startY, endX, endY);
+            drawQuadCurve(g, startX, startY, (int) ctrlX, (int) ctrlY, endX, endY);
         }
 
         if (directed) {
-            drawArrowhead(g, endX, endY, angle);
+            // Arrowhead tangent = end-tangent of the quadratic (P2 - C).
+            double endAngle = Math.atan2(endY - ctrlY, endX - ctrlX);
+            drawArrowhead(g, endX, endY, endAngle);
         }
 
-        int mx = (x1 + x2) / 2;
-        int my = (y1 + y2) / 2;
+        // Weight label: draw at the curve's apex, offset a bit more.
+        int midX = (int) ((startX + 2 * ctrlX + endX) / 4.0);
+        int midY = (int) ((startY + 2 * ctrlY + endY) / 4.0);
         g.setColor(new Color(80, 80, 80));
-        g.drawString("" + weight, mx + 4, my - 4);
+        g.drawString("" + weight, midX + 4, midY - 4);
+    }
+
+    /** Draws a quadratic Bezier, falling back to a straight line if flat. */
+    private void drawQuadCurve(Graphics g, int x0, int y0, int cx, int cy, int x1, int y1) {
+        if (cx == (x0 + x1) / 2 && cy == (y0 + y1) / 2) {
+            g.drawLine(x0, y0, x1, y1);
+            return;
+        }
+        int segments = 16;
+        int prevX = x0, prevY = y0;
+        for (int i = 1; i <= segments; i++) {
+            double t = i / (double) segments;
+            double mt = 1 - t;
+            double xx = mt * mt * x0 + 2 * mt * t * cx + t * t * x1;
+            double yy = mt * mt * y0 + 2 * mt * t * cy + t * t * y1;
+            int xi = (int) Math.round(xx);
+            int yi = (int) Math.round(yy);
+            g.drawLine(prevX, prevY, xi, yi);
+            prevX = xi;
+            prevY = yi;
+        }
     }
 
     private void drawArrowhead(Graphics g, int tipX, int tipY, double angle) {
@@ -136,21 +185,37 @@ public class Edge {
         int x1 = vertex1.location.x, y1 = vertex1.location.y;
         int x2 = vertex2.location.x, y2 = vertex2.location.y;
 
-        double dx = x2 - x1;
-        double dy = y2 - y1;
-        double lenSq = dx * dx + dy * dy;
+        double angle = Math.atan2(y2 - y1, x2 - x1);
 
-        if (lenSq == 0) {
-            return Math.hypot(px - x1, py - y1) <= TOLERANCE;
+        int startX = (int) (x1 + VERTEX_RADIUS * Math.cos(angle));
+        int startY = (int) (y1 + VERTEX_RADIUS * Math.sin(angle));
+        int endX   = (int) (x2 - VERTEX_RADIUS * Math.cos(angle));
+        int endY   = (int) (y2 - VERTEX_RADIUS * Math.sin(angle));
+
+        boolean hasReverse = hasReverseArc();
+
+        double mx = (startX + endX) / 2.0;
+        double my = (startY + endY) / 2.0;
+        double perpX = -(endY - startY);
+        double perpY =  (endX - startX);
+        double perpLen = Math.hypot(perpX, perpY);
+        if (perpLen == 0) perpLen = 1;
+
+        int curveOffset = hasReverse ? CURVE_OFFSET : 0;
+        double ctrlX = mx + (perpX / perpLen) * curveOffset;
+        double ctrlY = my + (perpY / perpLen) * curveOffset;
+
+        // Walk along the quadratic; minimum distance to (px, py) must be <= TOLERANCE.
+        int segments = 24;
+        double best = Double.MAX_VALUE;
+        for (int i = 0; i <= segments; i++) {
+            double t = i / (double) segments;
+            double mt = 1 - t;
+            double xx = mt * mt * startX + 2 * mt * t * ctrlX + t * t * endX;
+            double yy = mt * mt * startY + 2 * mt * t * ctrlY + t * t * endY;
+            double d = Math.hypot(px - xx, py - yy);
+            if (d < best) best = d;
         }
-
-        double t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
-        if (t < 0.0) t = 0.0;
-        else if (t > 1.0) t = 1.0;
-
-        double projX = x1 + t * dx;
-        double projY = y1 + t * dy;
-
-        return Math.hypot(px - projX, py - projY) <= TOLERANCE;
+        return best <= TOLERANCE;
     }
 }
