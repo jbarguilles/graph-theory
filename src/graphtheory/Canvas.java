@@ -202,14 +202,14 @@ public class Canvas {
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_BACK_SPACE, 0), "walkUndo");
         am.put("walkUndo", new AbstractAction() {
             public void actionPerformed(ActionEvent e) {
-                if (selectedTool == 7) { undoWalkStep(); refresh(); }
+                if (selectedTool == 7 && selectedWindow == 0) { undoWalkStep(); refresh(); }
             }
         });
 
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "walkClear");
         am.put("walkClear", new AbstractAction() {
             public void actionPerformed(ActionEvent e) {
-                if (selectedTool == 7) { clearWalk(); refresh(); }
+                if (selectedTool == 7 && selectedWindow == 0) { clearWalk(); refresh(); }
             }
         });
     }
@@ -293,7 +293,7 @@ public class Canvas {
                     case 7: {
                         if (SwingUtilities.isRightMouseButton(e)) {
                             undoWalkStep();
-                        } else {
+                        } else if (SwingUtilities.isLeftMouseButton(e)) {
                             handleWalkClick(e.getX(), e.getY());
                         }
                         refresh();
@@ -556,6 +556,7 @@ public class Canvas {
             String command = e.getActionCommand();
 
             clearHover();
+            walkMessage = null;
 
             if (command.equals("Add Vertex")) {
                 selectedTool = 1;
@@ -847,7 +848,7 @@ public class Canvas {
     private void drawWalkInfoBox(Graphics g) {
         if (currentWalk == null && walkMessage == null) return;
 
-        int x = 10, y = 420, w = 400, h = 95;
+        int x = 10, y = 420, w = 360, h = 95;
         g.setColor(new Color(235, 250, 250));
         g.fillRect(x, y, w, h);
         g.setColor(Color.BLACK);
@@ -859,7 +860,7 @@ public class Canvas {
             g.drawString("Walk: (none)", lx, ty); ty += 16;
         } else {
             Walk w0 = currentWalk;
-            g.drawString("Walk: " + truncate(w0.toString(), 60), lx, ty); ty += 16;
+            g.drawString("Walk: " + truncate(w0.toString(), 54), lx, ty); ty += 16;
             g.drawString("Length: " + w0.length(), lx, ty); ty += 16;
             g.drawString("Trail: " + yesNo(w0.isTrail())
                     + "   Path: " + yesNo(w0.isPath()), lx, ty); ty += 16;

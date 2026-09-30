@@ -76,7 +76,15 @@ public class Edge {
             int ovalW = 24;
             int ovalH = 24;
 
-            g.drawOval(ovalX, ovalY, ovalW, ovalH);
+            if ((removeHover || highlight != null) && g instanceof Graphics2D) {
+                Graphics2D g2 = (Graphics2D) g;
+                Stroke old = g2.getStroke();
+                g2.setStroke(new BasicStroke(3.0f));
+                g2.drawOval(ovalX, ovalY, ovalW, ovalH);
+                g2.setStroke(old);
+            } else {
+                g.drawOval(ovalX, ovalY, ovalW, ovalH);
+            }
 
             if (directed) {
                 int tipX = ovalX + ovalW / 2 + 4;
