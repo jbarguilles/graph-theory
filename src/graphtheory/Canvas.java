@@ -359,21 +359,24 @@ public class Canvas {
             if (selectedWindow == 0 && vertexList.size() > 0) {
                 switch (selectedTool) {
                     case 2: {
-                        Vertex parentV = vertexList.get(clickedVertexIndex);
-                        for (Vertex v : vertexList) {
-                            if (v.hasIntersection(e.getX(), e.getY()) && !v.connectedToVertex(parentV)) {
-                                Edge edge = new Edge(v, parentV, false);
-                                v.addUndirectedNeighbor(parentV);
-                                parentV.addUndirectedNeighbor(v);
-                                v.wasClicked = false;
-                                parentV.wasClicked = false;
-                                edgeList.add(edge);
-                            } else {
-                                v.wasClicked = false;
+                                Vertex parentV = vertexList.get(clickedVertexIndex);
+                                for (Vertex v : vertexList) {
+                                    if (v.hasIntersection(e.getX(), e.getY()) && !v.connectedToVertex(parentV)) {
+                                        Edge edge = new Edge(v, parentV, false);
+                                        v.addUndirectedNeighbor(parentV);
+                                        if (v != parentV) {
+                                            // For a self-loop, v == parentV, so only add the entry once.
+                                            parentV.addUndirectedNeighbor(v);
+                                        }
+                                        v.wasClicked = false;
+                                        parentV.wasClicked = false;
+                                        edgeList.add(edge);
+                                    } else {
+                                        v.wasClicked = false;
+                                    }
+                                }
+                                break;
                             }
-                        }
-                        break;
-                    }
                     case 5: {
                         Vertex parentV = vertexList.get(clickedVertexIndex);
                         for (Vertex v : vertexList) {
@@ -622,7 +625,7 @@ public class Canvas {
         }
         if (clicked == null) return;
 
-        int x = 10, y = 10, w = 170, h = 126;
+        int x = 10, y = 10, w = 170, h = 142;
         g.setColor(new Color(245, 245, 245));
         g.fillRect(x, y, w, h);
         g.setColor(Color.BLACK);
@@ -634,6 +637,7 @@ public class Canvas {
         g.drawString("In-Degree: " + clicked.inDegree(),    x + 6, ty); ty += 16;
         g.drawString("Out-Degree: " + clicked.outDegree(),  x + 6, ty); ty += 16;
         g.drawString("Isolated: " + clicked.isIsolated(),   x + 6, ty); ty += 16;
+        g.drawString("Self-loop: " + clicked.hasSelfLoop(), x + 6, ty); ty += 16;
         g.drawString("Cutpoint: " + clicked.isCutpoint,     x + 6, ty); ty += 16;
         g.drawString("Root: " + clicked.isRoot,             x + 6, ty);
     }

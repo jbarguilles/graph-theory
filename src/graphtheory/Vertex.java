@@ -52,11 +52,41 @@ public class Vertex implements Comparable {
             || outNeighbors.contains(v);
     }
 
-    public int degree() {
-        int d = undirectedNeighbors.size();
+    /**
+     * True if this vertex has any self-loop, undirected or directed.
+     */
+    public boolean hasSelfLoop() {
         for (Vertex v : undirectedNeighbors) {
-            if (v == this) d++;   // undirected self-loop counts as 2
+            if (v == this) return true;
         }
+        for (Vertex v : outNeighbors) {
+            if (v == this) return true;
+        }
+        // inNeighbors is covered by outNeighbors for a directed self-loop,
+        // but check defensively in case the data was hand-edited.
+        for (Vertex v : inNeighbors) {
+            if (v == this) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Undirected degree. A self-loop contributes 2.
+     *
+     * This is robust even if the neighbor list accidentally stores `this`
+     * more than once — we only count 2 for any number of self-loop entries.
+     */
+    public int degree() {
+        int d = 0;
+        boolean sawSelfLoop = false;
+        for (Vertex v : undirectedNeighbors) {
+            if (v == this) {
+                sawSelfLoop = true;   // do not double-count duplicates
+            } else {
+                d++;
+            }
+        }
+        if (sawSelfLoop) d += 2;
         return d;
     }
 
@@ -68,6 +98,12 @@ public class Vertex implements Comparable {
         return outNeighbors.size();
     }
 
+    /**
+     * Total degree = undirected degree + in-degree + out-degree.
+     * For an undirected self-loop, degree() already adds 2, and
+     * in/out are empty, so the total is 2 (correct).
+     * For a directed self-loop, degree() is 0, in=1, out=1, total 2 (correct).
+     */
     public int getDegree() {
         return degree() + inDegree() + outDegree();
     }
