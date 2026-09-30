@@ -185,8 +185,6 @@ public class Canvas {
                         Vertex v = new Vertex("" + vertexList.size(), e.getX(), e.getY());
                         vertexList.add(v);
                         v.draw(graphic);
-                        // A brand-new vertex can't be hovered at the old position;
-                        // recompute hover based on the current click position.
                         updateHover(e.getX(), e.getY());
                         break;
                     }
@@ -257,10 +255,7 @@ public class Canvas {
 
                             vertexList.remove(victim);
 
-                            // Recompute hover for the new graph state at the click position.
                             updateHover(e.getX(), e.getY());
-
-                            erase();
                             refresh();
                             break;
                         }
@@ -287,10 +282,7 @@ public class Canvas {
                             }
                             edgeList.remove(edgeVictim);
 
-                            // Recompute hover for the new graph state at the click position.
                             updateHover(e.getX(), e.getY());
-
-                            erase();
                             refresh();
                         }
                         break;
@@ -330,6 +322,10 @@ public class Canvas {
                         break;
                     }
                     case 3: {
+                        // Clear any previous selection so only one vertex is selected.
+                        for (Vertex v : vertexList) {
+                            v.wasClicked = false;
+                        }
 
                         for (Edge d : edgeList) {
                             if (d.hasIntersection(e.getX(), e.getY())) {
@@ -343,10 +339,13 @@ public class Canvas {
                             if (v.hasIntersection(e.getX(), e.getY())) {
                                 v.wasClicked = true;
                                 clickedVertexIndex = vertexList.indexOf(v);
-                            } else {
-                                v.wasClicked = false;
                             }
                         }
+
+                        // Repaint now so the info box appears on the very first
+                        // click — before any drag happens.
+                        updateHover(e.getX(), e.getY());
+                        refresh();
                         break;
                     }
                 }
@@ -359,24 +358,24 @@ public class Canvas {
             if (selectedWindow == 0 && vertexList.size() > 0) {
                 switch (selectedTool) {
                     case 2: {
-                                Vertex parentV = vertexList.get(clickedVertexIndex);
-                                for (Vertex v : vertexList) {
-                                    if (v.hasIntersection(e.getX(), e.getY()) && !v.connectedToVertex(parentV)) {
-                                        Edge edge = new Edge(v, parentV, false);
-                                        v.addUndirectedNeighbor(parentV);
-                                        if (v != parentV) {
-                                            // For a self-loop, v == parentV, so only add the entry once.
-                                            parentV.addUndirectedNeighbor(v);
-                                        }
-                                        v.wasClicked = false;
-                                        parentV.wasClicked = false;
-                                        edgeList.add(edge);
-                                    } else {
-                                        v.wasClicked = false;
-                                    }
+                        Vertex parentV = vertexList.get(clickedVertexIndex);
+                        for (Vertex v : vertexList) {
+                            if (v.hasIntersection(e.getX(), e.getY()) && !v.connectedToVertex(parentV)) {
+                                Edge edge = new Edge(v, parentV, false);
+                                v.addUndirectedNeighbor(parentV);
+                                if (v != parentV) {
+                                    // For a self-loop, only add the entry once.
+                                    parentV.addUndirectedNeighbor(v);
                                 }
-                                break;
+                                v.wasClicked = false;
+                                parentV.wasClicked = false;
+                                edgeList.add(edge);
+                            } else {
+                                v.wasClicked = false;
                             }
+                        }
+                        break;
+                    }
                     case 5: {
                         Vertex parentV = vertexList.get(clickedVertexIndex);
                         for (Vertex v : vertexList) {
@@ -394,14 +393,13 @@ public class Canvas {
                         break;
                     }
                     case 3: {
-                        vertexList.get(clickedVertexIndex).wasClicked = false;
+                        // Keep the vertex selected after release so the info
+                        // box stays visible. Do NOT clear wasClicked here.
                         break;
                     }
                 }
             }
-            // After any release, refresh hover from current cursor position.
             updateHover(e.getX(), e.getY());
-            erase();
             refresh();
         }
 
@@ -409,16 +407,17 @@ public class Canvas {
         public void mouseDragged(MouseEvent e) {
 
             if (selectedWindow == 0 && vertexList.size() > 0) {
-                erase();
                 switch (selectedTool) {
                     case 2:
                     case 5: {
+                        // Draw the rubber-band line on top of a fresh redraw.
+                        refresh();
                         graphic.setColor(Color.RED);
                         drawLine(vertexList.get(clickedVertexIndex).location.x,
                                  vertexList.get(clickedVertexIndex).location.y,
                                  e.getX(), e.getY());
-                        break;
-
+                        canvas.repaint();
+                        return;
                     }
                     case 3: {
                         if (vertexList.get(clickedVertexIndex).wasClicked) {
@@ -428,7 +427,6 @@ public class Canvas {
                         break;
                     }
                 }
-                // While dragging a vertex, hover state must follow it.
                 updateHover(e.getX(), e.getY());
                 refresh();
             }
@@ -449,7 +447,6 @@ public class Canvas {
         public void actionPerformed(ActionEvent e) {
             String command = e.getActionCommand();
 
-            // Any tool/menu action clears the "about to be removed" preview.
             clearHover();
 
             if (command.equals("Add Vertex")) {
@@ -473,10 +470,8 @@ public class Canvas {
                         v.isRoot = !v.isRoot;
                     }
                 }
-                erase();
             } else if (command.equals("Auto Arrange Vertices")) {
                 arrangeVertices();
-                erase();
             } else if (command.equals("Remove All")) {
                 edgeList.removeAllElements();
                 vertexList.removeAllElements();
@@ -484,7 +479,6 @@ public class Canvas {
                 pairedVertex1Index = -1;
                 pairedVertex2Index = -1;
                 currentPairVP = null;
-                erase();
             } else if (command.equals("Open File")) {
                 int returnValue = fileManager.jF.showOpenDialog(frame);
                 if (returnValue == JFileChooser.APPROVE_OPTION) {
@@ -500,30 +494,23 @@ public class Canvas {
                 }
             } else if (command.equals("Graph")) {
                 selectedWindow = 0;
-                erase();
             } else if (command.equals("Properties")) {
                 selectedWindow = 1;
                 if (vertexList.size() > 0) {
-                    //adjacency list
                     int[][] matrix = gP.generateAdjacencyMatrix(vertexList, edgeList);
 
-                    //connectivity
                     Vector<Vertex> tempList = gP.vertexConnectivity(vertexList);
                     for (Vertex v : tempList) {
                         vertexList.get(vertexList.indexOf(v)).wasClicked = true;
                     }
                     reloadVertexConnections(matrix, vertexList);
 
-                    //distance
                     gP.generateDistanceMatrix(vertexList);
                     gP.computeCutpoints(vertexList);
                     gP.computeBridges(vertexList, edgeList);
 
-                    //VD paths
                     gP.displayContainers(vertexList);
-                    //gP.drawNWideDiameter();
                 }
-                erase();
             }
 
             refresh();
@@ -537,7 +524,6 @@ public class Canvas {
         double centerY = height / 2;
         int interval = 360 / vertexList.size();
 
-
         for (int i = 0; i < vertexList.size(); i++) {
             double degInRad = i * deg2rad * interval;
             double x = centerX + (Math.cos(degInRad) * radius);
@@ -547,7 +533,6 @@ public class Canvas {
             vertexList.get(i).location.x = X;
             vertexList.get(i).location.y = Y;
         }
-
     }
 
     private void reloadVertexConnections(int[][] aMatrix, Vector<Vertex> vList) {
@@ -562,25 +547,30 @@ public class Canvas {
                 }
             }
         }
-
     }
 
     private void loadFile(Vector<Vector> File) {
         vertexList = File.firstElement();
         edgeList = File.lastElement();
-        erase();
+        refresh();
     }
 
+    /**
+     * Rebuilds the off-screen buffer from scratch, then asks Swing to repaint.
+     * Calling erase() first is essential: without it, hover highlights that
+     * were drawn in a previous frame would still be visible under the new
+     * (thinner) strokes.
+     */
     public void refresh() {
-    erase();                       // <-- clear the buffer first
-    for (Edge e : edgeList) {
-        e.draw(graphic);
+        erase();
+        for (Edge e : edgeList) {
+            e.draw(graphic);
+        }
+        for (Vertex v : vertexList) {
+            v.draw(graphic);
+        }
+        canvas.repaint();
     }
-    for (Vertex v : vertexList) {
-        v.draw(graphic);
-    }
-    canvas.repaint();
-}
 
     public void setVisible(boolean visible) {
         if (graphic == null) {
@@ -600,7 +590,9 @@ public class Canvas {
     }
 
     public void erase() {
-        graphic.clearRect(0, 0, width, height);
+        graphic.setColor(backgroundColour);
+        graphic.fillRect(0, 0, width, height);
+        graphic.setColor(Color.black);
     }
 
     public void erase(int x, int y, int x1, int y2) {
@@ -648,7 +640,6 @@ public class Canvas {
         Vertex v1 = currentPairVP.vertex1;
         Vertex v2 = currentPairVP.vertex2;
 
-        // Adjacent: direct edge exists in either direction (respecting direction for directed)
         boolean adjacent = false;
         for (Edge e : edgeList) {
             if ((e.vertex1 == v1 && e.vertex2 == v2) ||
@@ -661,7 +652,6 @@ public class Canvas {
         boolean reachable = dist != -1;
         Vector<Vertex> geodesic = currentPairVP.getShortestPath();
 
-        // Build geodesic string (truncate if too long)
         String geodesicStr = "";
         if (geodesic != null) {
             StringBuilder sb = new StringBuilder();
@@ -672,10 +662,8 @@ public class Canvas {
             geodesicStr = sb.length() > 28 ? sb.substring(0, 25) + "..." : sb.toString();
         }
 
-        // Simple paths (Walk without repeated vertices = Path)
         int pathCount = currentPairVP.pathList != null ? currentPairVP.pathList.size() : 0;
 
-        // Max vertex-disjoint width
         int maxWidth = 0;
         if (currentPairVP.VertexDisjointContainer != null) {
             for (Vector<Vector<Vertex>> c : currentPairVP.VertexDisjointContainer) {
@@ -683,7 +671,6 @@ public class Canvas {
             }
         }
 
-        // Ordered pair label
         String pairLabel = v1.name + " → " + v2.name;
 
         int x = 190, y = 10, w = 270, h = 178;
@@ -705,10 +692,8 @@ public class Canvas {
         }
         g.drawString("Simple paths (Walk∩no-repeat): " + pathCount, lx, ty); ty += 15;
         g.drawString("Max vertex-disjoint width: " + maxWidth,     lx, ty); ty += 15;
-        // Closed: v1 == v2 (only meaningful if same vertex selected)
         boolean closed = (v1 == v2);
         g.drawString("Closed walk possible: " + closed,            lx, ty); ty += 15;
-        // Trail = walk with no repeated edges; path count >= 1 implies trails exist
         g.drawString("Trail/Path exists: " + reachable,            lx, ty); ty += 15;
         g.drawString("Tour (closed trail): " + closed,             lx, ty);
     }
@@ -728,22 +713,20 @@ public class Canvas {
                     break;
                 }
                 case 1: {   //properties window
-                    canvasImage2.getGraphics().clearRect(0, 0, width, height); //clear
-                    gP.drawAdjacencyMatrix(canvasImage2.getGraphics(), vertexList, width / 2 + 50, 50);//draw adjacency matrix
-                    gP.drawDistanceMatrix(canvasImage2.getGraphics(), vertexList, width / 2 + 50, height / 2 + 50);//draw distance matrix
+                    canvasImage2.getGraphics().clearRect(0, 0, width, height);
+                    gP.drawAdjacencyMatrix(canvasImage2.getGraphics(), vertexList, width / 2 + 50, 50);
+                    gP.drawDistanceMatrix(canvasImage2.getGraphics(), vertexList, width / 2 + 50, height / 2 + 50);
                     gP.drawNodePropertiesTable(canvasImage2.getGraphics(), vertexList, 10, height / 2 + 70);
                     gP.drawGraphSummary(canvasImage2.getGraphics(), vertexList, edgeList, width / 2 + 50, height - 110);
-                    g.drawImage(canvasImage2, 0, 0, null); //layer 1
+                    g.drawImage(canvasImage2, 0, 0, null);
                     drawString("Graph disconnects when nodes in color red are removed.", 100, height - 30, 20);
                     g.drawString("See output console for Diameter of Graph", 100, height / 2 + 50);
-                    g.drawImage(canvasImage.getScaledInstance(width / 2, height / 2, Image.SCALE_SMOOTH), 0, 0, null); //layer 1
+                    g.drawImage(canvasImage.getScaledInstance(width / 2, height / 2, Image.SCALE_SMOOTH), 0, 0, null);
                     g.draw3DRect(0, 0, width / 2, height / 2, true);
                     g.setColor(Color.black);
-
                     break;
                 }
             }
-
         }
     }
 }
