@@ -202,6 +202,37 @@ public class WalkTest {
     }
 
     @Test
+    public void twoOppositeArcs_isCycleOfLengthTwo() {
+        Walk w = new Walk(a);
+        assertTrue(w.extend(arc(a, b)));
+        assertTrue(w.extend(arc(b, a)));
+        assertEquals(2, w.length());
+        assertTrue(w.isCycle());
+    }
+
+    @Test
+    public void twoParallelUndirectedEdges_isCycleOfLengthTwo() {
+        Walk w = new Walk(a);
+        assertTrue(w.extend(und(a, b)));
+        assertTrue(w.extend(und(a, b)));
+        assertEquals(2, w.length());
+        assertSame(a, w.end());
+        assertTrue(w.isTrail());
+        assertTrue(w.isCycle());
+    }
+
+    @Test
+    public void selfLoopTwice_notTrailNotCycle() {
+        Edge loop = und(a, a);
+        Walk w = new Walk(a);
+        assertTrue(w.extend(loop));
+        assertTrue(w.extend(loop));
+        assertTrue(w.isClosed());
+        assertFalse(w.isTrail());
+        assertFalse(w.isCycle());
+    }
+
+    @Test
     public void edgeLabel_formats() {
         assertEquals("{a,b}", Walk.edgeLabel(und(a, b), a));
         assertEquals("{b,a}", Walk.edgeLabel(und(a, b), b));
