@@ -235,9 +235,126 @@ public class GraphProperties {
         return -1;
     }
 
+    // ---- Connectivity: strict version (isolated vertices count) ----
+
+    /**
+     * Public strict connectivity: a graph is connected iff every vertex is
+     * reachable from every other vertex when edges are treated as undirected.
+     * Isolated vertices count as separate components unless there is only
+     * one vertex total.
+     */
+    public boolean isConnected(Vector<Vertex> vList) {
+        return countComponents(vList) == 1;
+    }
+
+    /**
+     * Number of weakly connected components in the graph.
+     *  - 0 vertices → 0
+     *  - 1 vertex   → 1 (trivially a single component)
+     *  - otherwise  → number of BFS seeds needed to reach every vertex.
+     * Isolated vertices each count as their own component.
+     */
+    public int countComponents(Vector<Vertex> vList) {
+        if (vList.isEmpty()) return 0;
+
+        Set<Vertex> visited = new HashSet<Vertex>();
+        int components = 0;
+
+        for (Vertex start : vList) {
+            if (visited.contains(start)) continue;
+            components++;
+            ArrayDeque<Vertex> queue = new ArrayDeque<Vertex>();
+            visited.add(start);
+            queue.add(start);
+            while (!queue.isEmpty()) {
+                Vertex u = queue.poll();
+                for (Vertex n : u.undirectedNeighbors) {
+                    if (!visited.contains(n) && vList.contains(n)) { visited.add(n); queue.add(n); }
+                }
+                for (Vertex n : u.outNeighbors) {
+                    if (!visited.contains(n) && vList.contains(n)) { visited.add(n); queue.add(n); }
+                }
+                for (Vertex n : u.inNeighbors) {
+                    if (!visited.contains(n) && vList.contains(n)) { visited.add(n); queue.add(n); }
+                }
+            }
+        }
+        return components;
+    }
+
+    /**
+     * Strong connectivity (only meaningful for directed graphs).
+     *
+     * A directed graph is strongly connected iff for every ordered pair
+     * (u, v) there is a directed path u → v. Practical test: a single BFS
+     * from any vertex following out-edges reaches everything, AND a single
+     * BFS from that same vertex following in-edges reaches everything.
+     *
+     * Returns false for 0 or 1 vertices (trivial).
+     */
+    public boolean isStronglyConnected(Vector<Vertex> vList) {
+        int n = vList.size();
+        if (n <= 1) return false;
+
+        Vertex start = vList.firstElement();
+        if (!reachesAll(start, vList, true))  return false;
+        if (!reachesAll(start, vList, false)) return false;
+        return true;
+    }
+
+    /**
+     * BFS from `start` and report whether every vertex in `vList` was reached.
+     * If forward == true, follow out-edges and undirected edges (both ways).
+     * If forward == false, follow in-edges and undirected edges (both ways).
+     */
+    private boolean reachesAll(Vertex start, Vector<Vertex> vList, boolean forward) {
+        Set<Vertex> visited = new HashSet<Vertex>();
+        ArrayDeque<Vertex> queue = new ArrayDeque<Vertex>();
+        visited.add(start);
+        queue.add(start);
+
+        while (!queue.isEmpty()) {
+            Vertex u = queue.poll();
+            // undirected edges work in both directions
+            for (Vertex n : u.undirectedNeighbors) {
+                if (vList.contains(n) && visited.add(n)) queue.add(n);
+            }
+            if (forward) {
+                for (Vertex n : u.outNeighbors) {
+                    if (vList.contains(n) && visited.add(n)) queue.add(n);
+                }
+            } else {
+                for (Vertex n : u.inNeighbors) {
+                    if (vList.contains(n) && visited.add(n)) queue.add(n);
+                }
+            }
+        }
+
+        for (Vertex v : vList) {
+            if (!visited.contains(v)) return false;
+        }
+        return true;
+    }
+
+    /** True if any edge in the list is directed. */
+    public boolean hasDirectedEdges(Vector<Edge> eList) {
+        for (Edge e : eList) if (e.directed) return true;
+        return false;
+    }
+
+    /**
+     * String shown in the "Strongly connected" row:
+     *   - "—" (not applicable) if no directed edges exist
+     *   - "Yes" / "No" otherwise
+     */
+    private String strongConnectivityLabel(Vector<Vertex> vList, Vector<Edge> eList) {
+        if (!hasDirectedEdges(eList)) return "\u2014";   // em dash
+        return isStronglyConnected(vList) ? "Yes" : "No";
+    }
+
     // ---- Connectivity for Euler checks (isolated vertices ignored) ----
 
-    private boolean isConnected(Vector<Vertex> vList) {
+    private boolean isConnectedIgnoringIsolated(Vector<Vertex> vList) {
         if (vList.isEmpty()) return true;
         Vector<Vertex> nonIsolated = new Vector<Vertex>();
         for (Vertex v : vList) { if (!v.isIsolated()) nonIsolated.add(v); }
@@ -257,13 +374,13 @@ public class GraphProperties {
     // ---- Euler conditions ----
 
     public boolean hasEulerCircuit(Vector<Vertex> vList) {
-        if (!isConnected(vList)) return false;
+        if (!isConnectedIgnoringIsolated(vList)) return false;
         for (Vertex v : vList) { if (!v.isIsolated() && v.getDegree() % 2 != 0) return false; }
         return true;
     }
 
     public boolean hasEulerPath(Vector<Vertex> vList) {
-        if (!isConnected(vList)) return false;
+        if (!isConnectedIgnoringIsolated(vList)) return false;
         int odd = 0;
         for (Vertex v : vList) { if (!v.isIsolated() && v.getDegree() % 2 != 0) odd++; }
         return odd == 0 || odd == 2;
@@ -307,7 +424,7 @@ public class GraphProperties {
         return false;
     }
 
-    // ---- Graph summary (with κ(G), λ(G), and V/E sets) ----
+    // ---- Graph summary (with κ, λ, connected, strongly connected, V/E sets) ----
 
     public int drawGraphSummary(Graphics g, Vector<Vertex> vList, Vector<Edge> eList, int x, int y) {
         int bridgeCount = 0;
@@ -347,6 +464,10 @@ public class GraphProperties {
         if (size > maxEdgesShown) eBody.append(", ...");
         String eLine = "E = {" + eBody + "}";
 
+        String connectedStr = isConnected(vList)
+                ? "Yes"
+                : ("No (" + countComponents(vList) + " components)");
+
         String[] lines = {
             "Graph Summary",
             "Order |V|: " + order,
@@ -354,6 +475,8 @@ public class GraphProperties {
             "Magnitude |V|+|E|: " + magnitude,
             "Connectivity \u03BA(G): " + vertexConnectivityValue,
             "Edge connectivity \u03BB(G): " + edgeConnectivityValue,
+            "Connected: " + connectedStr,
+            "Strongly connected: " + strongConnectivityLabel(vList, eList),
             "Bridges: " + bridgeCount + (bridgeCount > 0 ? " (purple)" : ""),
             "Euler Circuit: " + (eulerCircuit ? "Yes" : "No"),
             "Euler Path (Trail): " + (eulerPath ? "Yes" : "No"),
@@ -364,7 +487,7 @@ public class GraphProperties {
         };
 
         int rowH = 16;
-        int w = 340;
+        int w = 360;
         int h = lines.length * rowH + 6;
 
         g.setColor(new Color(255, 255, 220));
@@ -491,7 +614,6 @@ public class GraphProperties {
 
     /**
      * True if the graph, with `removed` vertices excluded, is weakly connected.
-     *
      * Convention:
      *  - 0 or 1 remaining vertex: trivially connected.
      *  - ≥ 2 remaining vertices, all isolated: disconnected.
@@ -505,7 +627,6 @@ public class GraphProperties {
         }
         if (alive.size() <= 1) return true;
 
-        // Non-isolated vertices among the alive set.
         Vector<Vertex> nonIsolated = new Vector<Vertex>();
         for (Vertex v : alive) {
             boolean hasAnyEdge =
@@ -515,10 +636,8 @@ public class GraphProperties {
             if (hasAnyEdge) nonIsolated.add(v);
         }
 
-        // ≥ 2 alive vertices, none with any edge → disconnected.
         if (nonIsolated.isEmpty()) return false;
 
-        // BFS over alive, non-isolated vertices.
         Set<Vertex> visited = new HashSet<Vertex>();
         ArrayDeque<Vertex> queue = new ArrayDeque<Vertex>();
         Vertex start = nonIsolated.firstElement();
@@ -549,17 +668,6 @@ public class GraphProperties {
 
     // ---- Edge connectivity λ(G) ----
 
-    /**
-     * Computes λ(G): the minimum number of edges whose removal either
-     * disconnects G or reduces it to a single vertex.
-     *
-     * Brute-force over all subsets of edges of size 0, 1, 2, ... — exponential
-     * in |E|, but fast enough for teaching-sized graphs.
-     *
-     * Side effects:
-     *   - edgeConnectivityValue = λ(G)
-     *   - witnessEdges = a minimum cut set of that size
-     */
     public int edgeConnectivity(Vector<Vertex> vList, Vector<Edge> eList) {
         witnessEdges = new Vector<Edge>();
         edgeConnectivityValue = 0;
@@ -567,15 +675,13 @@ public class GraphProperties {
         int n = vList.size();
         if (n <= 1) return 0;
 
-        // Fast path: already disconnected → λ = 0
         if (!isWeaklyConnected(vList, new HashSet<Vertex>())) {
             return 0;
         }
 
         int m = eList.size();
-        if (m == 0) return 0;   // no edges, ≥ 2 vertices → disconnected
+        if (m == 0) return 0;
 
-        // Try edge subsets of increasing size
         for (int k = 1; k <= m; k++) {
             Vector<Edge> cut = new Vector<Edge>();
             if (findEdgeCutOfSize(vList, eList, k, 0, cut)) {
@@ -585,7 +691,6 @@ public class GraphProperties {
             }
         }
 
-        // Shouldn't reach here — removing all edges definitely disconnects
         edgeConnectivityValue = m;
         witnessEdges = new Vector<Edge>(eList);
         return m;
@@ -609,66 +714,44 @@ public class GraphProperties {
     }
 
     /**
- * Same convention as isWeaklyConnected, but the "removed" objects are
- * edges. Vertices remain all alive; edges in `removedEdges` are ignored.
- *
- * For λ(G), an isolated vertex after the cut still counts — the graph
- * is disconnected. Only the trivial case n <= 1 is treated as connected.
- */
-private boolean isWeaklyConnectedWithoutEdges(Vector<Vertex> vList, Vector<Edge> removedEdges) {
-    int n = vList.size();
-    if (n <= 1) return true;
-
-    // BFS from any vertex, walking only surviving edges.
-    Set<Vertex> visited = new HashSet<Vertex>();
-    ArrayDeque<Vertex> queue = new ArrayDeque<Vertex>();
-    Vertex start = vList.firstElement();
-    visited.add(start);
-    queue.add(start);
-
-    while (!queue.isEmpty()) {
-        Vertex u = queue.poll();
-
-        // undirected
-        for (Vertex w : u.undirectedNeighbors) {
-            if (!edgeIsRemoved(u, w, removedEdges)) {
-                if (visited.add(w)) queue.add(w);
-            }
-        }
-        // out
-        for (Vertex w : u.outNeighbors) {
-            if (!edgeIsRemoved(u, w, removedEdges)) {
-                if (visited.add(w)) queue.add(w);
-            }
-        }
-        // in (u is the destination; w is the source)
-        for (Vertex w : u.inNeighbors) {
-            if (!edgeIsRemoved(w, u, removedEdges)) {
-                if (visited.add(w)) queue.add(w);
-            }
-        }
-    }
-
-    // Every vertex must have been reached.
-    for (Vertex v : vList) {
-        if (!visited.contains(v)) return false;
-    }
-    return true;
-}
-
-    /** True if u has at least one incident edge not in `removedEdges`. */
-    private boolean hasLiveIncidentEdge(Vertex u, Vector<Vertex> vList, Vector<Edge> removedEdges) {
-        for (Vertex w : u.undirectedNeighbors) if (!edgeIsRemoved(u, w, removedEdges)) return true;
-        for (Vertex w : u.outNeighbors)        if (!edgeIsRemoved(u, w, removedEdges)) return true;
-        for (Vertex w : u.inNeighbors)         if (!edgeIsRemoved(w, u, removedEdges)) return true;
-        return false;
-    }
-
-    /**
-     * True if the edge u→v (or undirected u—v) is in `removedEdges`.
-     * Matching ignores direction for undirected edges, but distinguishes
-     * antiparallel directed arcs.
+     * Same convention as isWeaklyConnected, but the "removed" objects are
+     * edges. For λ(G), an isolated vertex after the cut still counts.
      */
+    private boolean isWeaklyConnectedWithoutEdges(Vector<Vertex> vList, Vector<Edge> removedEdges) {
+        int n = vList.size();
+        if (n <= 1) return true;
+
+        Set<Vertex> visited = new HashSet<Vertex>();
+        ArrayDeque<Vertex> queue = new ArrayDeque<Vertex>();
+        Vertex start = vList.firstElement();
+        visited.add(start);
+        queue.add(start);
+
+        while (!queue.isEmpty()) {
+            Vertex u = queue.poll();
+            for (Vertex w : u.undirectedNeighbors) {
+                if (!edgeIsRemoved(u, w, removedEdges)) {
+                    if (visited.add(w)) queue.add(w);
+                }
+            }
+            for (Vertex w : u.outNeighbors) {
+                if (!edgeIsRemoved(u, w, removedEdges)) {
+                    if (visited.add(w)) queue.add(w);
+                }
+            }
+            for (Vertex w : u.inNeighbors) {
+                if (!edgeIsRemoved(w, u, removedEdges)) {
+                    if (visited.add(w)) queue.add(w);
+                }
+            }
+        }
+
+        for (Vertex v : vList) {
+            if (!visited.contains(v)) return false;
+        }
+        return true;
+    }
+
     private boolean edgeIsRemoved(Vertex u, Vertex v, Vector<Edge> removedEdges) {
         for (Edge e : removedEdges) {
             if (e.vertex1 == u && e.vertex2 == v) return true;
