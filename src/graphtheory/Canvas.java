@@ -333,7 +333,7 @@ public class Canvas {
             currentWalk = Traversals.eulerTour(vertexList, edgeList);
         } else if (kind.equals("Hamiltonian Path")) {
             currentWalk = Traversals.hamiltonianPath(vertexList, edgeList);
-        } else {
+        } else if (kind.equals("Hamiltonian Cycle")) {
             currentWalk = Traversals.hamiltonianCycle(vertexList, edgeList);
         }
         if (currentWalk == null) walkMessage = "No " + kind + " exists";
