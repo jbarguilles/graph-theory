@@ -852,7 +852,7 @@ public class Canvas {
         if (geodesic != null) {
             StringBuilder sb = new StringBuilder();
             for (int i = 0; i < geodesic.size(); i++) {
-                if (i > 0) sb.append("→");
+                if (i > 0) sb.append("\u2192");
                 sb.append(geodesic.get(i).name);
             }
             geodesicStr = sb.length() > 28 ? sb.substring(0, 25) + "..." : sb.toString();
@@ -865,7 +865,7 @@ public class Canvas {
             }
         }
 
-        String pairLabel = v1.name + " → " + v2.name;
+        String pairLabel = v1.name + " \u2192 " + v2.name;
         int pathCount = pairPaths != null ? pairPaths.size() : 0;
         int rows = Math.min(PATH_ROWS, pathCount);
 
@@ -881,7 +881,7 @@ public class Canvas {
         g.drawString("Ordered pair: (" + pairLabel + ")",          lx, ty); ty += 15;
         g.drawString("Adjacent: " + adjacent,                      lx, ty); ty += 15;
         g.drawString("Reachable: " + reachable,                    lx, ty); ty += 15;
-        g.drawString("Distance: " + (reachable ? dist : "∞"), lx, ty); ty += 15;
+        g.drawString("Distance: " + (reachable ? dist : "\u221E"), lx, ty); ty += 15;
         if (!geodesicStr.isEmpty()) {
             g.drawString("Geodesic path: " + geodesicStr,          lx, ty); ty += 15;
         } else {
@@ -889,7 +889,7 @@ public class Canvas {
         }
         g.drawString("Max vertex-disjoint width: " + maxWidth,     lx, ty); ty += 15;
         g.drawString("Paths " + pairLabel + ": " + pathCount
-                + (pathCount > 1 ? "   (↑/↓ to browse)" : ""),     lx, ty); ty += 15;
+                + (pathCount > 1 ? "   (\u2191/\u2193 to browse)" : ""),     lx, ty); ty += 15;
 
         if (pathCount == 0) {
             g.drawString("  No path from " + v1.name + " to " + v2.name, lx, ty);
@@ -907,7 +907,7 @@ public class Canvas {
             }
             String row = (i + 1) + ". " + truncate(p.toString(), 40)
                     + "  len " + p.length()
-                    + (p.length() == minLen ? "  ← geodesic" : "");
+                    + (p.length() == minLen ? "  \u2190 geodesic" : "");
             g.drawString(row, lx, ty);
             ty += 15;
         }
