@@ -20,42 +20,46 @@ import java.util.Vector;
 public class GraphProperties {
 
     public int[][] adjacencyMatrix;
+    public int[][] weightedAdjacencyMatrix;   // 0 = no edge, else weight
     public int[][] distanceMatrix;
     public Vector<VertexPair> vpList;
 
     public int[][] generateAdjacencyMatrix(Vector<Vertex> vList, Vector<Edge> eList) {
         adjacencyMatrix = new int[vList.size()][vList.size()];
+        weightedAdjacencyMatrix = new int[vList.size()][vList.size()];
 
         for (Edge e : eList) {
             int i = vList.indexOf(e.vertex1);
             int j = vList.indexOf(e.vertex2);
             if (i < 0 || j < 0) continue;
+
             adjacencyMatrix[i][j] = 1;
+            weightedAdjacencyMatrix[i][j] = e.weight;
+
             if (!e.directed) {
                 adjacencyMatrix[j][i] = 1;
+                weightedAdjacencyMatrix[j][i] = e.weight;
             }
         }
         return adjacencyMatrix;
     }
 
+    /**
+     * Weighted shortest paths between all pairs via Dijkstra per source.
+     * Uses EdgeRegistry, which Canvas.refresh() keeps in sync.
+     * Unreachable pairs get -1.
+     */
     public int[][] generateDistanceMatrix(Vector<Vertex> vList) {
         distanceMatrix = new int[vList.size()][vList.size()];
 
-        for (int a = 0; a < vList.size(); a++)//initialize
-        {
-            for (int b = 0; b < vList.size(); b++) {
-                distanceMatrix[a][b] = 0;
-            }
-        }
-
-        VertexPair vp;
-        int shortestDistance;
         for (int i = 0; i < vList.size(); i++) {
-            for (int j = i + 1; j < vList.size(); j++) {
-                vp = new VertexPair(vList.get(i), vList.get(j));
-                shortestDistance = vp.getShortestDistance();
-                distanceMatrix[vList.indexOf(vp.vertex1)][vList.indexOf(vp.vertex2)] = shortestDistance;
-                distanceMatrix[vList.indexOf(vp.vertex2)][vList.indexOf(vp.vertex1)] = shortestDistance;
+            for (int j = 0; j < vList.size(); j++) {
+                if (i == j) {
+                    distanceMatrix[i][j] = 0;
+                    continue;
+                }
+                VertexPair vp = new VertexPair(vList.get(i), vList.get(j));
+                distanceMatrix[i][j] = vp.getShortestDistance();   // -1 if unreachable
             }
         }
         return distanceMatrix;
@@ -70,35 +74,31 @@ public class GraphProperties {
 
         VertexPair vp;
 
-        for (int a = 0; a < vList.size(); a++) {    // assign vertex pairs
+        for (int a = 0; a < vList.size(); a++) {
             for (int b = a + 1; b < vList.size(); b++) {
                 vp = new VertexPair(vList.get(a), vList.get(b));
                 vpList.add(vp);
                 int longestWidth = 0;
                 System.out.println(">Vertex Pair " + vList.get(a).name + "-" + vList.get(b).name + "\n All Paths:");
                 vp.generateVertexDisjointPaths();
-                for (int i = 0; i < vp.VertexDisjointContainer.size(); i++) {//for every container of the vertex pair
+                for (int i = 0; i < vp.VertexDisjointContainer.size(); i++) {
                     int width = vp.VertexDisjointContainer.get(i).size();
                     Collections.sort(vp.VertexDisjointContainer.get(i), new descendingWidthComparator());
                     int longestLength = vp.VertexDisjointContainer.get(i).firstElement().size();
                     longestWidth = Math.max(longestWidth, width);
                     System.out.println("\tContainer " + i + " - " + "Width=" + width + " - Length=" + longestLength);
 
-                    for (int j = 0; j < vp.VertexDisjointContainer.get(i).size(); j++) //for every path in the container
-                    {
+                    for (int j = 0; j < vp.VertexDisjointContainer.get(i).size(); j++) {
                         System.out.print("\t\tPath " + j + "\n\t\t\t");
                         for (int k = 0; k < vp.VertexDisjointContainer.get(i).get(j).size(); k++) {
                             System.out.print("-" + vp.VertexDisjointContainer.get(i).get(j).get(k).name);
                         }
                         System.out.println();
                     }
-
                 }
-                //d-wide for vertexPair
-                for (int k = 1; k <= longestWidth; k++) { // 1-wide, 2-wide, 3-wide...
+                for (int k = 1; k <= longestWidth; k++) {
                     int minLength = 999;
-                    for (int m = 0; m < vp.VertexDisjointContainer.size(); m++) // for each container with k-wide select shortest length
-                    {
+                    for (int m = 0; m < vp.VertexDisjointContainer.size(); m++) {
                         minLength = Math.min(minLength, vp.VertexDisjointContainer.get(m).size());
                     }
                     if (minLength != 999) {
@@ -119,7 +119,7 @@ public class GraphProperties {
     public void drawAdjacencyMatrix(Graphics g, Vector<Vertex> vList, int x, int y) {
         int cSize = 20;
         g.setColor(Color.LIGHT_GRAY);
-        g.fillRect(x, y-30, vList.size() * cSize+cSize, vList.size() * cSize+cSize);
+        g.fillRect(x, y - 30, vList.size() * cSize + cSize, vList.size() * cSize + cSize);
         g.setColor(Color.black);
         g.drawString("AdjacencyMatrix", x, y - cSize);
         for (int i = 0; i < vList.size(); i++) {
@@ -134,21 +134,23 @@ public class GraphProperties {
     }
 
     public void drawDistanceMatrix(Graphics g, Vector<Vertex> vList, int x, int y) {
-        int cSize = 20;
-        g.setColor(Color.LIGHT_GRAY);
-        g.fillRect(x, y-30, vList.size() * cSize+cSize, vList.size() * cSize+cSize);
+    int cSize = 20;
+    g.setColor(Color.LIGHT_GRAY);
+    g.fillRect(x, y - 30, vList.size() * cSize + cSize, vList.size() * cSize + cSize);
+    g.setColor(Color.black);
+    g.drawString("ShortestPathMatrix (weighted; ∞ = unreachable)", x, y - cSize);
+    for (int i = 0; i < vList.size(); i++) {
+        g.setColor(Color.RED);
+        g.drawString(vList.get(i).name, x + cSize + i * cSize, y);
+        g.drawString(vList.get(i).name, x, cSize + i * cSize + y);
         g.setColor(Color.black);
-        g.drawString("ShortestPathMatrix", x, y - cSize);
-        for (int i = 0; i < vList.size(); i++) {
-            g.setColor(Color.RED);
-            g.drawString(vList.get(i).name, x + cSize + i * cSize, y);
-            g.drawString(vList.get(i).name, x, cSize + i * cSize + y);
-            g.setColor(Color.black);
-            for (int j = 0; j < vList.size(); j++) {
-                g.drawString("" + distanceMatrix[i][j], x + cSize * (j + 1), y + cSize * (i + 1));
-            }
+        for (int j = 0; j < vList.size(); j++) {
+            int d = distanceMatrix[i][j];
+            String cell = (d < 0) ? "∞" : ("" + d);
+            g.drawString(cell, x + cSize * (j + 1), y + cSize * (i + 1));
         }
     }
+}
 
     public void drawNodePropertiesTable(Graphics g, Vector<Vertex> vList, int x, int y) {
         int rowH = 18;
@@ -169,13 +171,13 @@ public class GraphProperties {
             Vertex v = vList.get(r);
             int ry = y + (r + 2) * rowH;
             g.setColor(Color.BLACK);
-            g.drawString(v.name,               x + 0 * colW + 3, ry);
-            g.drawString("" + v.degree(),      x + 1 * colW + 3, ry);
-            g.drawString("" + v.inDegree(),    x + 2 * colW + 3, ry);
-            g.drawString("" + v.outDegree(),   x + 3 * colW + 3, ry);
-            g.drawString("" + v.isIsolated(),  x + 4 * colW + 3, ry);
-            g.drawString("" + v.isCutpoint,    x + 5 * colW + 3, ry);
-            g.drawString("" + v.isRoot,        x + 6 * colW + 3, ry);
+            g.drawString(v.name,              x + 0 * colW + 3, ry);
+            g.drawString("" + v.degree(),     x + 1 * colW + 3, ry);
+            g.drawString("" + v.inDegree(),   x + 2 * colW + 3, ry);
+            g.drawString("" + v.outDegree(),  x + 3 * colW + 3, ry);
+            g.drawString("" + v.isIsolated(), x + 4 * colW + 3, ry);
+            g.drawString("" + v.isCutpoint,   x + 5 * colW + 3, ry);
+            g.drawString("" + v.isRoot,       x + 6 * colW + 3, ry);
         }
     }
 
@@ -220,7 +222,7 @@ public class GraphProperties {
         return -1;
     }
 
-    // ---- Connectivity (uses all edge types) ----
+    // ---- Connectivity ----
 
     private boolean isConnected(Vector<Vertex> vList) {
         if (vList.isEmpty()) return true;
@@ -254,7 +256,7 @@ public class GraphProperties {
         return odd == 0 || odd == 2;
     }
 
-    // ---- Hamiltonian path / cycle (backtracking, capped at 20 vertices) ----
+    // ---- Hamiltonian ----
 
     public boolean hasHamiltonianPath(Vector<Vertex> vList) {
         if (vList.size() > 20) return false;
@@ -292,82 +294,76 @@ public class GraphProperties {
         return false;
     }
 
-    // ---- Graph summary (with Order / Size / Magnitude, and V/E sets) ----
+    // ---- Graph summary ----
 
-    /**
- * Draws the graph summary box. Returns the total height in pixels,
- * so callers can stack another panel directly below it.
- */
-public int drawGraphSummary(Graphics g, Vector<Vertex> vList, Vector<Edge> eList, int x, int y) {
-    int bridgeCount = 0;
-    for (Edge e : eList) { if (e.isBridge) bridgeCount++; }
+    public int drawGraphSummary(Graphics g, Vector<Vertex> vList, Vector<Edge> eList, int x, int y) {
+        int bridgeCount = 0;
+        for (Edge e : eList) { if (e.isBridge) bridgeCount++; }
 
-    boolean eulerCircuit = hasEulerCircuit(vList);
-    boolean eulerPath    = hasEulerPath(vList);
-    boolean hamPath      = vList.size() <= 20 && hasHamiltonianPath(vList);
-    boolean hamCycle     = vList.size() <= 20 && hasHamiltonianCycle(vList);
-    boolean tooLarge     = vList.size() > 20;
+        boolean eulerCircuit = hasEulerCircuit(vList);
+        boolean eulerPath    = hasEulerPath(vList);
+        boolean hamPath      = vList.size() <= 20 && hasHamiltonianPath(vList);
+        boolean hamCycle     = vList.size() <= 20 && hasHamiltonianCycle(vList);
+        boolean tooLarge     = vList.size() > 20;
 
-    int order     = vList.size();
-    int size      = eList.size();
-    int magnitude = order + size;
+        int order     = vList.size();
+        int size      = eList.size();
+        int magnitude = order + size;
 
-    // ---- V line ----
-    StringBuilder vBody = new StringBuilder();
-    for (int i = 0; i < vList.size(); i++) {
-        if (i > 0) vBody.append(", ");
-        vBody.append(vList.get(i).name);
-    }
-    String vLine = "V = {" + vBody + "}" ;
-
-    // ---- E line, truncated to at most 6 edges ----
-    int maxEdgesShown = 6;
-    int shown = Math.min(size, maxEdgesShown);
-    StringBuilder eBody = new StringBuilder();
-    for (int i = 0; i < shown; i++) {
-        if (i > 0) eBody.append(", ");
-        Edge e = eList.get(i);
-        if (e.directed) {
-            eBody.append("(").append(e.vertex1.name).append(", ")
-                 .append(e.vertex2.name).append(")");
-        } else {
-            eBody.append("{").append(e.vertex1.name).append(", ")
-                 .append(e.vertex2.name).append("}");
+        StringBuilder vBody = new StringBuilder();
+        for (int i = 0; i < vList.size(); i++) {
+            if (i > 0) vBody.append(", ");
+            vBody.append(vList.get(i).name);
         }
+        String vLine = "V = {" + vBody + "}";
+
+        int maxEdgesShown = 6;
+        int shown = Math.min(size, maxEdgesShown);
+        StringBuilder eBody = new StringBuilder();
+        for (int i = 0; i < shown; i++) {
+            if (i > 0) eBody.append(", ");
+            Edge e = eList.get(i);
+            if (e.directed) {
+                eBody.append("(").append(e.vertex1.name).append(", ")
+                     .append(e.vertex2.name).append(")");
+            } else {
+                eBody.append("{").append(e.vertex1.name).append(", ")
+                     .append(e.vertex2.name).append("}");
+            }
+        }
+        if (size > maxEdgesShown) eBody.append(", ...");
+        String eLine = "E = {" + eBody + "}";
+
+        String[] lines = {
+            "Graph Summary",
+            "Order |V|: " + order,
+            "Size |E|: " + size,
+            "Magnitude |V|+|E|: " + magnitude,
+            "Bridges: " + bridgeCount + (bridgeCount > 0 ? " (purple)" : ""),
+            "Euler Circuit: " + (eulerCircuit ? "Yes" : "No"),
+            "Euler Path (Trail): " + (eulerPath ? "Yes" : "No"),
+            "Hamiltonian Path: " + (tooLarge ? ">20 vertices" : (hamPath ? "Yes" : "No")),
+            "Hamiltonian Cycle: " + (tooLarge ? ">20 vertices" : (hamCycle ? "Yes" : "No")),
+            vLine,
+            eLine,
+        };
+
+        int rowH = 16;
+        int w = 340;
+        int h = lines.length * rowH + 6;
+
+        g.setColor(new Color(255, 255, 220));
+        g.fillRect(x, y - 14, w, h);
+        g.setColor(Color.BLACK);
+        g.drawRect(x, y - 14, w, h);
+
+        for (int i = 0; i < lines.length; i++) {
+            if (i == 0) g.setColor(new Color(60, 60, 60));
+            else        g.setColor(Color.BLACK);
+            g.drawString(lines[i], x + 4, y + i * rowH);
+        }
+        return h;
     }
-    if (size > maxEdgesShown) eBody.append(", ...");
-    String eLine = "E = {" + eBody + "}";
-
-    String[] lines = {
-        "Graph Summary",
-        "Order |V|: " + order,
-        "Size |E|: " + size,
-        "Magnitude |V|+|E|: " + magnitude,
-        "Bridges: " + bridgeCount + (bridgeCount > 0 ? " (purple)" : ""),
-        "Euler Circuit: " + (eulerCircuit ? "Yes" : "No"),
-        "Euler Path (Trail): " + (eulerPath ? "Yes" : "No"),
-        "Hamiltonian Path: " + (tooLarge ? ">20 vertices" : (hamPath ? "Yes" : "No")),
-        "Hamiltonian Cycle: " + (tooLarge ? ">20 vertices" : (hamCycle ? "Yes" : "No")),
-        vLine,
-        eLine,
-    };
-
-    int rowH = 16;
-    int w = 340;
-    int h = lines.length * rowH + 6;
-
-    g.setColor(new Color(255, 255, 220));
-    g.fillRect(x, y - 14, w, h);
-    g.setColor(Color.BLACK);
-    g.drawRect(x, y - 14, w, h);
-
-    for (int i = 0; i < lines.length; i++) {
-        if (i == 0) g.setColor(new Color(60, 60, 60));
-        else        g.setColor(Color.BLACK);
-        g.drawString(lines[i], x + 4, y + i * rowH);
-    }
-    return h;
-}
 
     // ---- Cutpoints ----
 
@@ -471,67 +467,41 @@ public int drawGraphSummary(Graphics g, Vector<Vertex> vList, Vector<Edge> eList
     }
 
     private boolean graphConnectivity(Vector<Vertex> vList) {
-
         Vector<Vertex> visitedList = new Vector<Vertex>();
-
-        recurseGraphConnectivity(vList.firstElement().undirectedNeighbors, visitedList); //recursive function
-        if (visitedList.size() != vList.size()) {
-            return false;
-        } else {
-            return true;
-        }
+        recurseGraphConnectivity(vList.firstElement().undirectedNeighbors, visitedList);
+        return visitedList.size() == vList.size();
     }
 
     private void recurseGraphConnectivity(Vector<Vertex> vList, Vector<Vertex> visitedList) {
         for (Vertex v : vList) {
-            {
-                if (!visitedList.contains(v)) {
-                    visitedList.add(v);
-                    recurseGraphConnectivity(v.undirectedNeighbors, visitedList);
-                }
+            if (!visitedList.contains(v)) {
+                visitedList.add(v);
+                recurseGraphConnectivity(v.undirectedNeighbors, visitedList);
             }
         }
     }
 
     private class ascendingDegreeComparator implements Comparator {
-
         public int compare(Object v1, Object v2) {
-
-            if (((Vertex) v1).getDegree() > ((Vertex) v2).getDegree()) {
-                return 1;
-            } else if (((Vertex) v1).getDegree() > ((Vertex) v2).getDegree()) {
-                return -1;
-            } else {
-                return 0;
-            }
+            if (((Vertex) v1).getDegree() > ((Vertex) v2).getDegree()) return 1;
+            else if (((Vertex) v1).getDegree() < ((Vertex) v2).getDegree()) return -1;
+            else return 0;
         }
     }
 
     private class descendingDegreeComparator implements Comparator {
-
         public int compare(Object v1, Object v2) {
-
-            if (((Vertex) v1).getDegree() > ((Vertex) v2).getDegree()) {
-                return -1;
-            } else if (((Vertex) v1).getDegree() > ((Vertex) v2).getDegree()) {
-                return 1;
-            } else {
-                return 0;
-            }
+            if (((Vertex) v1).getDegree() > ((Vertex) v2).getDegree()) return -1;
+            else if (((Vertex) v1).getDegree() < ((Vertex) v2).getDegree()) return 1;
+            else return 0;
         }
     }
 
     private class descendingWidthComparator implements Comparator {
-
         public int compare(Object v1, Object v2) {
-
-            if (((Vector<Vertex>) v1).size() > (((Vector<Vertex>) v2).size())) {
-                return -1;
-            } else if (((Vector<Vertex>) v1).size() < (((Vector<Vertex>) v2).size())) {
-                return 1;
-            } else {
-                return 0;
-            }
+            if (((Vector<Vertex>) v1).size() > (((Vector<Vertex>) v2).size())) return -1;
+            else if (((Vector<Vertex>) v1).size() < (((Vector<Vertex>) v2).size())) return 1;
+            else return 0;
         }
     }
 }

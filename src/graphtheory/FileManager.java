@@ -10,7 +10,6 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.Writer;
 import java.util.Scanner;
 import java.util.Vector;
 import javax.swing.JFileChooser;
@@ -25,15 +24,13 @@ public class FileManager {
 
     public FileManager() {
         jF = new JFileChooser();
-
-
     }
 
-    public void saveFile(Vector<Vertex> vList, File fName) {
+    public void saveFile(Vector<Vertex> vList, Vector<Edge> eList, File fName) {
         try {
             BufferedWriter out = new BufferedWriter(new FileWriter(fName));
 
-            out.write(""+vList.size());
+            out.write("" + vList.size());
             out.newLine();
             for (Vertex v : vList) {
                 out.write(v.name);
@@ -53,12 +50,20 @@ public class FileManager {
                 out.write(vList.get(k).location.x + "," + vList.get(k).location.y);
                 out.newLine();
             }
+
+            // Weights section (in edgeList order)
+            out.write("" + eList.size());
+            out.newLine();
+            for (Edge ed : eList) {
+                out.write("" + ed.weight);
+                out.newLine();
+            }
+
             out.close();
 
         } catch (IOException e) {
             System.out.println(e);
         }
-
     }
 
     public Vector<Vector> loadFile(File fName) {
@@ -70,12 +75,12 @@ public class FileManager {
             Scanner data = new Scanner(f);
             if (data.hasNext()) {
                 int size = Integer.parseInt(data.nextLine());
-                for (int i = 0; i < size; i++) {//vertex only
+                for (int i = 0; i < size; i++) {
                     Vertex v = new Vertex(data.nextLine(), 0, 0);
                     vertexList.add(v);
                 }
 
-                for (int j = 0; j < vertexList.size(); j++) { // adjacency list
+                for (int j = 0; j < vertexList.size(); j++) {
                     String adjacencyLine = data.nextLine();
                     System.out.println(adjacencyLine);
                     for (int k = 0; k < vertexList.size(); k++) {
@@ -84,8 +89,7 @@ public class FileManager {
                         }
                     }
 
-
-                    for (int l = j + 1; l < vertexList.size(); l++) { //edges
+                    for (int l = j + 1; l < vertexList.size(); l++) {
                         if (adjacencyLine.charAt(l) == '1') {
                             Edge e = new Edge(vertexList.get(j), vertexList.get(l), false);
                             edgeList.add(e);
@@ -96,10 +100,25 @@ public class FileManager {
                 if (data.hasNextLine()) {
                     for (Vertex v : vertexList) {
                         String pos = data.nextLine();
-                        v.location = new Point(Integer.parseInt(pos.split(",")[0]), Integer.parseInt(pos.split(",")[1]));
+                        v.location = new Point(Integer.parseInt(pos.split(",")[0]),
+                                               Integer.parseInt(pos.split(",")[1]));
                     }
                 }
 
+                // Optional weights section (tolerates old files without it)
+                if (data.hasNextLine()) {
+                    String edgeCountLine = data.nextLine().trim();
+                    if (!edgeCountLine.isEmpty()) {
+                        int edgeCount = Integer.parseInt(edgeCountLine);
+                        for (int i = 0; i < edgeCount && i < edgeList.size(); i++) {
+                            if (!data.hasNextLine()) break;
+                            String wLine = data.nextLine().trim();
+                            if (!wLine.isEmpty()) {
+                                edgeList.get(i).weight = Integer.parseInt(wLine);
+                            }
+                        }
+                    }
+                }
             }
         } catch (Exception e) {
             System.out.println(e);
