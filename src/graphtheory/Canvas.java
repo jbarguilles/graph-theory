@@ -225,7 +225,7 @@ public class Canvas {
         int rightHeight = 50
                 + matrixHeight + 20
                 + matrixHeight + 20
-                + 14 * 16 + 20;  
+                + 15 * 16 + 20;   // was 14 * 16 + 20
         // Left column total height: preview + gap + node table + captions
         int leftHeight = 10
                        + height / 2 + 20

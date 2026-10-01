@@ -237,23 +237,10 @@ public class GraphProperties {
 
     // ---- Connectivity: strict version (isolated vertices count) ----
 
-    /**
-     * Public strict connectivity: a graph is connected iff every vertex is
-     * reachable from every other vertex when edges are treated as undirected.
-     * Isolated vertices count as separate components unless there is only
-     * one vertex total.
-     */
     public boolean isConnected(Vector<Vertex> vList) {
         return countComponents(vList) == 1;
     }
 
-    /**
-     * Number of weakly connected components in the graph.
-     *  - 0 vertices → 0
-     *  - 1 vertex   → 1 (trivially a single component)
-     *  - otherwise  → number of BFS seeds needed to reach every vertex.
-     * Isolated vertices each count as their own component.
-     */
     public int countComponents(Vector<Vertex> vList) {
         if (vList.isEmpty()) return 0;
 
@@ -282,16 +269,6 @@ public class GraphProperties {
         return components;
     }
 
-    /**
-     * Strong connectivity (only meaningful for directed graphs).
-     *
-     * A directed graph is strongly connected iff for every ordered pair
-     * (u, v) there is a directed path u → v. Practical test: a single BFS
-     * from any vertex following out-edges reaches everything, AND a single
-     * BFS from that same vertex following in-edges reaches everything.
-     *
-     * Returns false for 0 or 1 vertices (trivial).
-     */
     public boolean isStronglyConnected(Vector<Vertex> vList) {
         int n = vList.size();
         if (n <= 1) return false;
@@ -302,11 +279,6 @@ public class GraphProperties {
         return true;
     }
 
-    /**
-     * BFS from `start` and report whether every vertex in `vList` was reached.
-     * If forward == true, follow out-edges and undirected edges (both ways).
-     * If forward == false, follow in-edges and undirected edges (both ways).
-     */
     private boolean reachesAll(Vertex start, Vector<Vertex> vList, boolean forward) {
         Set<Vertex> visited = new HashSet<Vertex>();
         ArrayDeque<Vertex> queue = new ArrayDeque<Vertex>();
@@ -315,7 +287,6 @@ public class GraphProperties {
 
         while (!queue.isEmpty()) {
             Vertex u = queue.poll();
-            // undirected edges work in both directions
             for (Vertex n : u.undirectedNeighbors) {
                 if (vList.contains(n) && visited.add(n)) queue.add(n);
             }
@@ -336,20 +307,53 @@ public class GraphProperties {
         return true;
     }
 
-    /** True if any edge in the list is directed. */
     public boolean hasDirectedEdges(Vector<Edge> eList) {
         for (Edge e : eList) if (e.directed) return true;
         return false;
     }
 
-    /**
-     * String shown in the "Strongly connected" row:
-     *   - "—" (not applicable) if no directed edges exist
-     *   - "Yes" / "No" otherwise
-     */
     private String strongConnectivityLabel(Vector<Vertex> vList, Vector<Edge> eList) {
-        if (!hasDirectedEdges(eList)) return "\u2014";   // em dash
+        if (!hasDirectedEdges(eList)) return "\u2014";
         return isStronglyConnected(vList) ? "Yes" : "No";
+    }
+
+    // ---- Density / Sparse vs Dense ----
+
+    /**
+     * Density of the graph, in [0, 1].
+     *  - Undirected simple graph: |E| / (|V|*(|V|-1)/2)
+     *  - Directed simple graph:   |E| / (|V|*(|V|-1))
+     *  - Mixed graph: uses the directed ceiling.
+     * Returns 0 for |V| <= 1.
+     */
+    public double density(Vector<Vertex> vList, Vector<Edge> eList) {
+        int n = vList.size();
+        if (n <= 1) return 0.0;
+
+        boolean anyDirected = hasDirectedEdges(eList);
+        double maxEdges = anyDirected
+                ? (double) n * (n - 1)
+                : (double) n * (n - 1) / 2.0;
+        if (maxEdges == 0) return 0.0;
+
+        return eList.size() / maxEdges;
+    }
+
+    /**
+     * Sparse / Dense / In between, using density thresholds:
+     *   density < 0.25  → "Sparse"
+     *   density > 0.75  → "Dense"
+     *   otherwise       → "In between"
+     * Returns "—" for |V| <= 1 (not meaningful).
+     */
+    public String sparseDenseLabel(Vector<Vertex> vList, Vector<Edge> eList) {
+        int n = vList.size();
+        if (n <= 1) return "\u2014";
+
+        double d = density(vList, eList);
+        if (d < 0.25) return "Sparse";
+        if (d > 0.75) return "Dense";
+        return "In between";
     }
 
     // ---- Connectivity for Euler checks (isolated vertices ignored) ----
@@ -424,7 +428,7 @@ public class GraphProperties {
         return false;
     }
 
-    // ---- Graph summary (with κ, λ, connected, strongly connected, V/E sets) ----
+    // ---- Graph summary (with κ, λ, connected, strongly connected, density, V/E sets) ----
 
     public int drawGraphSummary(Graphics g, Vector<Vertex> vList, Vector<Edge> eList, int x, int y) {
         int bridgeCount = 0;
@@ -468,6 +472,11 @@ public class GraphProperties {
                 ? "Yes"
                 : ("No (" + countComponents(vList) + " components)");
 
+        String densityStr = (vList.size() <= 1)
+                ? "\u2014"
+                : (String.format("%.2f", density(vList, eList))
+                   + " (" + sparseDenseLabel(vList, eList) + ")");
+
         String[] lines = {
             "Graph Summary",
             "Order |V|: " + order,
@@ -477,6 +486,7 @@ public class GraphProperties {
             "Edge connectivity \u03BB(G): " + edgeConnectivityValue,
             "Connected: " + connectedStr,
             "Strongly connected: " + strongConnectivityLabel(vList, eList),
+            "Density |E|/maxE: " + densityStr,
             "Bridges: " + bridgeCount + (bridgeCount > 0 ? " (purple)" : ""),
             "Euler Circuit: " + (eulerCircuit ? "Yes" : "No"),
             "Euler Path (Trail): " + (eulerPath ? "Yes" : "No"),
@@ -487,7 +497,7 @@ public class GraphProperties {
         };
 
         int rowH = 16;
-        int w = 360;
+        int w = 380;
         int h = lines.length * rowH + 6;
 
         g.setColor(new Color(255, 255, 220));
@@ -573,12 +583,10 @@ public class GraphProperties {
         int n = vList.size();
         if (n <= 1) return 0;
 
-        // Fast path: already disconnected → κ = 0
         if (!isWeaklyConnected(vList, new HashSet<Vertex>())) {
             return 0;
         }
 
-        // Try subsets of increasing size
         for (int k = 1; k < n; k++) {
             Vector<Vertex> cut = new Vector<Vertex>();
             if (findCutOfSize(vList, k, 0, cut)) {
@@ -588,7 +596,6 @@ public class GraphProperties {
             }
         }
 
-        // Fallback: need to remove n-1 vertices (complete graph)
         vertexConnectivityValue = n - 1;
         for (int i = 0; i < n - 1; i++) {
             witnessVertices.add(vList.get(i));
@@ -598,10 +605,7 @@ public class GraphProperties {
 
     private boolean findCutOfSize(Vector<Vertex> vList, int k, int start, Vector<Vertex> out) {
         if (out.size() == k) {
-            if (!isWeaklyConnected(vList, new HashSet<Vertex>(out))) {
-                return true;
-            }
-            return false;
+            return !isWeaklyConnected(vList, new HashSet<Vertex>(out));
         }
         for (int i = start; i < vList.size(); i++) {
             Vertex v = vList.get(i);
@@ -612,13 +616,6 @@ public class GraphProperties {
         return false;
     }
 
-    /**
-     * True if the graph, with `removed` vertices excluded, is weakly connected.
-     * Convention:
-     *  - 0 or 1 remaining vertex: trivially connected.
-     *  - ≥ 2 remaining vertices, all isolated: disconnected.
-     *  - Otherwise, only non-isolated vertices matter for connectivity.
-     */
     private boolean isWeaklyConnected(Vector<Vertex> vList, Set<Vertex> removed) {
         Vector<Vertex> alive = new Vector<Vertex>();
         for (Vertex v : vList) {
@@ -699,10 +696,7 @@ public class GraphProperties {
     private boolean findEdgeCutOfSize(Vector<Vertex> vList, Vector<Edge> eList,
                                       int k, int start, Vector<Edge> out) {
         if (out.size() == k) {
-            if (!isWeaklyConnectedWithoutEdges(vList, out)) {
-                return true;
-            }
-            return false;
+            return !isWeaklyConnectedWithoutEdges(vList, out);
         }
         for (int i = start; i < eList.size(); i++) {
             Edge e = eList.get(i);
@@ -713,10 +707,6 @@ public class GraphProperties {
         return false;
     }
 
-    /**
-     * Same convention as isWeaklyConnected, but the "removed" objects are
-     * edges. For λ(G), an isolated vertex after the cut still counts.
-     */
     private boolean isWeaklyConnectedWithoutEdges(Vector<Vertex> vList, Vector<Edge> removedEdges) {
         int n = vList.size();
         if (n <= 1) return true;
