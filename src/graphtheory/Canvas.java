@@ -113,6 +113,15 @@ public class Canvas {
         item.addActionListener(new MenuListener());
         menuOptions2.add(item);
 
+        item = new JMenuItem("Show Greedy Coloring");
+        item.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_C, KeyEvent.CTRL_DOWN_MASK));
+        item.addActionListener(new MenuListener());
+        menuOptions2.add(item);
+
+        item = new JMenuItem("Clear Coloring");
+        item.addActionListener(new MenuListener());
+        menuOptions2.add(item);
+
         item = new JMenuItem("Remove All");
         item.addActionListener(new MenuListener());
         menuOptions2.add(item);
@@ -178,16 +187,13 @@ public class Canvas {
                 int summaryY = distY + distHeight + 20;
                 int summaryHeight = gP.drawGraphSummary(g2, vertexList, edgeList, rightX, summaryY);
 
-                // Left column below the preview: Node Properties
                 int nodeY = height / 2 + 90;
                 gP.drawNodePropertiesTable(g2, vertexList, 10, nodeY);
                 int nodeTableHeight = (vertexList.size() + 2) * 18 + 10;
 
-                // Adjacency list, stacked below the Node Properties table.
                 int listY = nodeY + nodeTableHeight + 20;
                 gP.drawAdjacencyList(g2, vertexList, 10, listY);
 
-                // Bottom captions
                 int captionY = Math.max(
                         nodeY + (vertexList.size() + 2) * 18 + 40,
                         summaryY + summaryHeight + 40);
@@ -214,16 +220,16 @@ public class Canvas {
         int rightHeight = 50
                 + matrixHeight + 20
                 + matrixHeight + 20
-                + 28 * 16 + 20;
+                + 34 * 16 + 20;
         int leftHeight = 10
                        + height / 2 + 20
-                       + (vertexList.size() + 2) * 18 + 30       // node table
-                       + (vertexList.size() + 1) * 18 + 20       // adjacency list
+                       + (vertexList.size() + 2) * 18 + 30
+                       + (vertexList.size() + 1) * 18 + 20
                        + 80;
 
         int neededHeight = Math.max(rightHeight, leftHeight) + 60;
         neededHeight = Math.max(neededHeight, height);
-        int neededWidth = Math.max(width + 40, width / 2 + 60 + 400);
+        int neededWidth = Math.max(width + 40, width / 2 + 60 + 700);
 
         propertiesContent.setPreferredSize(new Dimension(neededWidth, neededHeight));
         propertiesContent.revalidate();
@@ -267,17 +273,17 @@ public class Canvas {
     }
 
     private void recomputeGraphProperties() {
-    if (!graphDirty) return;
-    if (vertexList.size() > 0) {
-        gP.computeCutpoints(vertexList);
-        gP.computeBridges(vertexList, edgeList);
-        gP.computeBlocks(vertexList, edgeList);   // <-- NEW
-    } else {
-        for (Vertex v : vertexList) v.isCutpoint = false;
-        for (Edge e : edgeList)   e.isBridge   = false;
+        if (!graphDirty) return;
+        if (vertexList.size() > 0) {
+            gP.computeCutpoints(vertexList);
+            gP.computeBridges(vertexList, edgeList);
+            gP.computeBlocks(vertexList, edgeList);
+        } else {
+            for (Vertex v : vertexList) v.isCutpoint = false;
+            for (Edge e : edgeList)   e.isBridge   = false;
+        }
+        graphDirty = false;
     }
-    graphDirty = false;
-}
 
     private Set<Vertex> connectedComponentOf(Vertex start) {
         Set<Vertex> visited = new HashSet<Vertex>();
@@ -606,9 +612,6 @@ public class Canvas {
                         break;
                     }
                     case 3: {
-                        // Grab Tool supports multi-select for the subgraph feature:
-                        //   click a vertex to toggle its selection;
-                        //   click empty space to clear all selections.
                         boolean hitAny = false;
                         for (Vertex v : vertexList) {
                             if (v.hasIntersection(e.getX(), e.getY())) {
@@ -776,6 +779,12 @@ public class Canvas {
                 } else {
                     showSubgraphWindow(sub);
                 }
+            } else if (command.equals("Show Greedy Coloring")) {
+                gP.greedyColoring(vertexList);
+                refresh();
+            } else if (command.equals("Clear Coloring")) {
+                gP.clearColoring(vertexList);
+                refresh();
             } else if (command.equals("Remove All")) {
                 edgeList.removeAllElements();
                 vertexList.removeAllElements();

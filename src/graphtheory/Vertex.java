@@ -21,6 +21,9 @@ public class Vertex implements Comparable {
     public boolean wasClicked;
     public boolean removeHover;
 
+    /** Color assigned by greedy coloring; -1 = uncolored (default white). */
+    public int colorId = -1;
+
     private int size1 = 30;
     private int size2 = 40;
     public Vector<Vertex> undirectedNeighbors;
@@ -28,6 +31,18 @@ public class Vertex implements Comparable {
     public Vector<Vertex> outNeighbors;
     public boolean isCutpoint;
     public boolean isRoot;
+
+    /** Palette for greedy coloring. Cycles through if colorId is large. */
+    public static final Color[] PALETTE = {
+        new Color(255, 179, 186),
+        new Color(186, 225, 255),
+        new Color(186, 255, 201),
+        new Color(255, 255, 186),
+        new Color(255, 200, 255),
+        new Color(200, 255, 255),
+        new Color(220, 200, 170),
+        new Color(220, 220, 220),
+    };
 
     public Vertex(String name, int x, int y) {
         this.name = name;
@@ -103,12 +118,15 @@ public class Vertex implements Comparable {
         }
         g.fillOval(location.x - size2 / 2, location.y - size2 / 2, size2, size2);
 
-        // 2) Inner white disc
-        g.setColor(Color.WHITE);
+        // 2) Inner disc — palette color if colored, else white
+        if (colorId >= 0) {
+            g.setColor(PALETTE[colorId % PALETTE.length]);
+        } else {
+            g.setColor(Color.WHITE);
+        }
         g.fillOval(location.x - size1 / 2, location.y - size1 / 2, size1, size1);
 
-        // 3) Property ring drawn ON TOP so it stays visible
-        //    even when the vertex is selected/hovered.
+        // 3) Property ring on top
         if (removeHover) {
             g.setColor(new Color(220, 0, 0));
             g.drawOval(location.x - size2 / 2 - 6, location.y - size2 / 2 - 6, size2 + 12, size2 + 12);

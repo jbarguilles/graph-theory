@@ -41,6 +41,12 @@ public class GraphProperties {
     /** List of blocks computed by the last call to computeBlocks(). */
     public Vector<Vector<Edge>> blockList = new Vector<Vector<Edge>>();
 
+    /** Colors assigned by the last call to greedyColoring(). Index = vertexList index. */
+    public int[] vertexColors = new int[0];
+
+    /** Chromatic number χ(G), or -1 if the graph is too large to compute. */
+    public int chromaticNumberValue = -1;
+
     public int[][] generateAdjacencyMatrix(Vector<Vertex> vList, Vector<Edge> eList) {
         adjacencyMatrix = new int[vList.size()][vList.size()];
         weightedAdjacencyMatrix = new int[vList.size()][vList.size()];
@@ -193,9 +199,6 @@ public class GraphProperties {
         }
     }
 
-    /**
-     * Draws the adjacency list representation. Returns total height in pixels.
-     */
     public int drawAdjacencyList(Graphics g, Vector<Vertex> vList, int x, int y) {
         int rowH = 18;
 
@@ -378,7 +381,6 @@ public class GraphProperties {
         return null;
     }
 
-    /** Returns the set of distinct vertices contained in a block. */
     public Set<Vertex> blockVertices(Vector<Edge> block) {
         Set<Vertex> s = new HashSet<Vertex>();
         for (Edge e : block) {
@@ -388,7 +390,6 @@ public class GraphProperties {
         return s;
     }
 
-    /** Number of blocks with 3 or more vertices. */
     public int countNontrivialBlocks() {
         int count = 0;
         for (Vector<Edge> block : blockList) {
@@ -397,15 +398,10 @@ public class GraphProperties {
         return count;
     }
 
-    /** A block is by definition maximal; this just reports whether any exist. */
     public boolean hasMaximalBlocks() {
         return blockCount > 0;
     }
 
-    /**
-     * Formats the block list as "{a, b, c}, {d, e}, ...".
-     * Truncates to maxLen characters if the string would be longer.
-     */
     public String formatBlocks(int maxLen) {
         if (blockList.isEmpty()) return "\u2014";
         StringBuilder sb = new StringBuilder();
@@ -414,7 +410,6 @@ public class GraphProperties {
             Vector<Edge> block = blockList.get(b);
             Set<Vertex> verts = blockVertices(block);
 
-            // Order by position in vertexList for a stable reading order.
             List<Vertex> ordered = new ArrayList<Vertex>(verts);
             ordered.sort(new Comparator<Vertex>() {
                 public int compare(Vertex a, Vertex c) {
@@ -436,15 +431,292 @@ public class GraphProperties {
         return result;
     }
 
-    /**
-     * True if the graph is nonseparable: connected and has no cut vertices.
-     * A single vertex or empty graph is trivially nonseparable.
-     */
     public boolean isNonseparable(Vector<Vertex> vList) {
         if (vList.size() < 2) return true;
         if (!isConnected(vList)) return false;
         for (Vertex v : vList) if (v.isCutpoint) return false;
         return true;
+    }
+
+    // ---- Graph coloring ----
+
+    public int[] greedyColoring(Vector<Vertex> vList) {
+        int n = vList.size();
+        int[] color = new int[n];
+        Arrays.fill(color, -1);
+
+        Integer[] order = new Integer[n];
+        for (int i = 0; i < n; i++) order[i] = i;
+        Arrays.sort(order, (a, b) -> Integer.compare(
+                vList.get(b).getDegree(), vList.get(a).getDegree()));
+
+        for (int idx : order) {
+            Vertex v = vList.get(idx);
+
+            Set<Integer> used = new HashSet<Integer>();
+            for (Vertex nbor : allNeighborsForColoring(v)) {
+                int ni = vList.indexOf(nbor);
+                if (ni >= 0 && color[ni] >= 0) used.add(color[ni]);
+            }
+
+            int c = 0;
+            while (used.contains(c)) c++;
+            color[idx] = c;
+        }
+
+        this.vertexColors = color;
+        for (int i = 0; i < n; i++) vList.get(i).colorId = color[i];
+        return color;
+    }
+
+    public void clearColoring(Vector<Vertex> vList) {
+        for (Vertex v : vList) v.colorId = -1;
+        this.vertexColors = new int[0];
+    }
+
+    public int chromaticNumber(Vector<Vertex> vList) {
+        int n = vList.size();
+        if (n == 0) { chromaticNumberValue = 0; return 0; }
+        if (n > 15) { chromaticNumberValue = -1; return -1; }
+
+        boolean anyEdge = false;
+        for (Vertex v : vList) if (v.getDegree() > 0) { anyEdge = true; break; }
+        if (!anyEdge) { chromaticNumberValue = 1; return 1; }
+
+        boolean[][] adj = new boolean[n][n];
+        for (int i = 0; i < n; i++) {
+            Vertex vi = vList.get(i);
+            for (int j = i + 1; j < n; j++) {
+                Vertex vj = vList.get(j);
+                if (areAdjacent(vi, vj)) {
+                    adj[i][j] = true;
+                    adj[j][i] = true;
+                }
+            }
+        }
+
+        int[] color = new int[n];
+
+        for (int k = 1; k <= n; k++) {
+            Arrays.fill(color, -1);
+            if (canColor(0, k, color, adj, n)) {
+                chromaticNumberValue = k;
+                return k;
+            }
+        }
+        chromaticNumberValue = n;
+        return n;
+    }
+
+    private boolean canColor(int v, int k, int[] color, boolean[][] adj, int n) {
+        if (v == n) return true;
+        for (int c = 0; c < k; c++) {
+            boolean conflict = false;
+            for (int u = 0; u < v; u++) {
+                if (adj[v][u] && color[u] == c) { conflict = true; break; }
+            }
+            if (conflict) continue;
+
+            color[v] = c;
+            if (canColor(v + 1, k, color, adj, n)) return true;
+            color[v] = -1;
+        }
+        return false;
+    }
+
+    private boolean areAdjacent(Vertex a, Vertex b) {
+        if (a.undirectedNeighbors.contains(b) || b.undirectedNeighbors.contains(a)) return true;
+        if (a.outNeighbors.contains(b) || b.outNeighbors.contains(a)) return true;
+        if (a.inNeighbors.contains(b) || b.inNeighbors.contains(a)) return true;
+        return false;
+    }
+
+    private List<Vertex> allNeighborsForColoring(Vertex u) {
+        List<Vertex> result = new ArrayList<Vertex>();
+        for (Vertex v : u.undirectedNeighbors) if (!result.contains(v)) result.add(v);
+        for (Vertex v : u.outNeighbors)        if (!result.contains(v)) result.add(v);
+        for (Vertex v : u.inNeighbors)         if (!result.contains(v)) result.add(v);
+        return result;
+    }
+
+    public String formatColoring(Vector<Vertex> vList, int maxLen) {
+        if (vertexColors.length != vList.size()) return "\u2014";
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < vList.size(); i++) {
+            if (i > 0) sb.append(", ");
+            sb.append(vList.get(i).name);
+            sb.append("=");
+            int c = vertexColors[i];
+            if (c < 0) {
+                sb.append("?");
+            } else {
+                sb.append((char) ('A' + (c % 26)));
+            }
+        }
+        String result = sb.toString();
+        if (result.length() > maxLen) {
+            result = result.substring(0, Math.max(0, maxLen - 3)) + "...";
+        }
+        return result;
+    }
+
+    // ---- Matching ----
+
+    public Vector<Edge> maximalMatching(Vector<Vertex> vList, Vector<Edge> eList) {
+        Set<Vertex> matched = new HashSet<Vertex>();
+        Vector<Edge> result = new Vector<Edge>();
+
+        for (Edge e : eList) {
+            if (e.directed) continue;
+            if (e.vertex1 == e.vertex2) continue;
+            if (matched.contains(e.vertex1) || matched.contains(e.vertex2)) continue;
+
+            result.add(e);
+            matched.add(e.vertex1);
+            matched.add(e.vertex2);
+        }
+        return result;
+    }
+
+    public Vector<Edge> maximumBipartiteMatching(Vector<Vertex> vList, Vector<Edge> eList) {
+        if (vList.isEmpty()) return new Vector<Edge>();
+        Vector<Vertex>[] sides = bipartiteSides(vList);
+        if (sides == null) return null;
+
+        Vector<Vertex> A = sides[0];
+
+        Map<Vertex, Vertex> matchA = new HashMap<Vertex, Vertex>();
+        Map<Vertex, Vertex> matchB = new HashMap<Vertex, Vertex>();
+
+        for (Vertex a : A) {
+            Set<Vertex> visited = new HashSet<Vertex>();
+            tryAugment(a, visited, matchA, matchB);
+        }
+
+        Vector<Edge> result = new Vector<Edge>();
+        for (Map.Entry<Vertex, Vertex> entry : matchA.entrySet()) {
+            Vertex a = entry.getKey();
+            Vertex b = entry.getValue();
+            for (Edge e : eList) {
+                if ((e.vertex1 == a && e.vertex2 == b) ||
+                    (!e.directed && e.vertex1 == b && e.vertex2 == a)) {
+                    result.add(e);
+                    break;
+                }
+            }
+        }
+        return result;
+    }
+
+    private boolean tryAugment(Vertex a, Set<Vertex> visited,
+                               Map<Vertex, Vertex> matchA, Map<Vertex, Vertex> matchB) {
+        for (Vertex b : allNeighborsForColoring(a)) {
+            if (matchB.containsKey(b) && !visited.add(b)) continue;
+
+            Vertex bCurrent = matchB.get(b);
+            if (bCurrent == null || tryAugment(bCurrent, visited, matchA, matchB)) {
+                matchA.put(a, b);
+                matchB.put(b, a);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean hasPerfectMatching(Vector<Vertex> vList, Vector<Edge> eList) {
+        if (vList.size() % 2 != 0) return false;
+        Vector<Edge> mm = maximumBipartiteMatching(vList, eList);
+        if (mm == null) return false;
+        return mm.size() * 2 == vList.size();
+    }
+
+    public Vector<Edge> stableMatching(Vector<Vertex> vList, Vector<Edge> eList) {
+        Vector<Vertex>[] sides = bipartiteSides(vList);
+        if (sides == null) return null;
+
+        Vector<Vertex> proposers = sides[0];
+
+        Map<Vertex, List<Vertex>> prefs = new HashMap<Vertex, List<Vertex>>();
+        for (Vertex v : vList) {
+            List<Vertex> lst = allNeighborsForColoring(v);
+            lst.sort((x, y) -> x.name.compareTo(y.name));
+            prefs.put(v, lst);
+        }
+
+        Map<Vertex, Integer> nextProposal = new HashMap<Vertex, Integer>();
+        for (Vertex p : proposers) nextProposal.put(p, 0);
+
+        Map<Vertex, Vertex> receiverPartner = new HashMap<Vertex, Vertex>();
+        Map<Vertex, Vertex> proposerPartner = new HashMap<Vertex, Vertex>();
+
+        ArrayDeque<Vertex> free = new ArrayDeque<Vertex>();
+        for (Vertex p : proposers) {
+            if (!prefs.get(p).isEmpty()) free.add(p);
+        }
+
+        while (!free.isEmpty()) {
+            Vertex p = free.poll();
+            int idx = nextProposal.get(p);
+            List<Vertex> prefList = prefs.get(p);
+            if (idx >= prefList.size()) continue;
+
+            Vertex r = prefList.get(idx);
+            nextProposal.put(p, idx + 1);
+
+            if (!receiverPartner.containsKey(r) || receiverPartner.get(r) == null) {
+                receiverPartner.put(r, p);
+                proposerPartner.put(p, r);
+            } else {
+                Vertex current = receiverPartner.get(r);
+                List<Vertex> rPrefs = prefs.get(r);
+                int pRank = rPrefs.indexOf(p);
+                int curRank = rPrefs.indexOf(current);
+                if (pRank < curRank) {
+                    receiverPartner.put(r, p);
+                    proposerPartner.put(p, r);
+                    proposerPartner.remove(current);
+                    free.add(current);
+                } else {
+                    free.add(p);
+                }
+            }
+        }
+
+        Vector<Edge> result = new Vector<Edge>();
+        for (Map.Entry<Vertex, Vertex> entry : proposerPartner.entrySet()) {
+            Vertex a = entry.getKey();
+            Vertex b = entry.getValue();
+            for (Edge e : eList) {
+                if ((e.vertex1 == a && e.vertex2 == b) ||
+                    (!e.directed && e.vertex1 == b && e.vertex2 == a)) {
+                    result.add(e);
+                    break;
+                }
+            }
+        }
+        return result;
+    }
+
+    public String formatMatching(Vector<Edge> matching, int maxLen) {
+        if (matching == null) return "\u2014";
+        if (matching.isEmpty()) return "0 edges";
+
+        StringBuilder sb = new StringBuilder();
+        sb.append(matching.size()).append(" edge");
+        if (matching.size() != 1) sb.append("s");
+        sb.append(": ");
+
+        for (int i = 0; i < matching.size(); i++) {
+            if (i > 0) sb.append(", ");
+            Edge e = matching.get(i);
+            sb.append("{").append(e.vertex1.name).append("-").append(e.vertex2.name).append("}");
+        }
+        String result = sb.toString();
+        if (result.length() > maxLen) {
+            result = result.substring(0, Math.max(0, maxLen - 3)) + "...";
+        }
+        return result;
     }
 
     // ---- Connectivity ----
@@ -1099,7 +1371,6 @@ public class GraphProperties {
                 : ("" + blockCount + " ("
                     + countNontrivialBlocks() + " nontrivial)");
 
-        // Long line listing each block's vertex set.
         String blockVerticesStr = vList.isEmpty()
                 ? "\u2014"
                 : formatBlocks(160);
@@ -1107,6 +1378,22 @@ public class GraphProperties {
         String nonsepStr = vList.size() < 2
                 ? "\u2014"
                 : (isNonseparable(vList) ? "Yes" : "No");
+
+        int chi = chromaticNumber(vList);
+        String chiStr = (vList.isEmpty()) ? "\u2014"
+                      : (chi == -1 ? ">15 vertices" : "" + chi);
+        String coloringStr = formatColoring(vList, 100);
+
+        Vector<Edge> maximalM = maximalMatching(vList, eList);
+        Vector<Edge> maximumM = maximumBipartiteMatching(vList, eList);
+        String maximalMStr = formatMatching(maximalM, 100);
+        String maximumMStr = (maximumM == null)
+                ? "\u2014 (not bipartite)"
+                : formatMatching(maximumM, 100);
+        String perfectMStr = (vList.size() < 2)
+                ? "\u2014"
+                : (hasPerfectMatching(vList, eList) ? "Yes" : "No");
+        String stableMStr = formatMatching(stableMatching(vList, eList), 100);
 
         String[] lines = {
             "Graph Summary",
@@ -1135,12 +1422,18 @@ public class GraphProperties {
             "Euler Path (Trail): " + (eulerPath ? "Yes" : "No"),
             "Hamiltonian Path: " + (tooLarge ? ">20 vertices" : (hamPath ? "Yes" : "No")),
             "Hamiltonian Cycle: " + (tooLarge ? ">20 vertices" : (hamCycle ? "Yes" : "No")),
+            "Chromatic number \u03C7(G): " + chiStr,
+            "Coloring (greedy): " + coloringStr,
+            "Maximal matching: " + maximalMStr,
+            "Maximum matching: " + maximumMStr,
+            "Perfect matching: " + perfectMStr,
+            "Stable matching: " + stableMStr,
             vLine,
             eLine,
         };
 
         int rowH = 16;
-        int w = 520;
+        int w = 640;
         int h = lines.length * rowH + 6;
 
         g.setColor(new Color(255, 255, 220));
