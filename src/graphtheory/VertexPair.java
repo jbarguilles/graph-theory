@@ -6,6 +6,7 @@ package graphtheory;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -110,6 +111,37 @@ public class VertexPair {
         return path;
     }
 
+    /**
+     * All paths from vertex1 to vertex2 as edge-aware walks, shortest first.
+     * Paths with the same vertices but different parallel edges are listed
+     * separately (ADR 0002). If vertex1 == vertex2 the result is the single
+     * trivial walk.
+     */
+    public Vector<Walk> generateEdgePaths(Vector<Edge> eList) {
+        Vector<Walk> result = new Vector<Walk>();
+        recurseEdgePaths(new Walk(vertex1), eList, result);
+        Collections.sort(result, new Comparator<Walk>() {
+            public int compare(Walk p, Walk q) {
+                return p.length() - q.length();
+            }
+        });
+        return result;
+    }
+
+    private void recurseEdgePaths(Walk w, Vector<Edge> eList, Vector<Walk> result) {
+        if (w.end() == vertex2) {
+            result.add(w.copy());
+            return;
+        }
+        for (Edge e : eList) {
+            if (!Walk.canTraverse(e, w.end())) continue;
+            if (w.visits(Walk.otherEnd(e, w.end()))) continue;
+            w.extend(e);
+            recurseEdgePaths(w, eList, result);
+            w.undo();
+        }
+    }
+
     /** All neighbors of u reachable via one edge (out + undirected). */
     private List<Vertex> allNeighbors(Vertex u) {
         List<Vertex> result = new ArrayList<Vertex>();
@@ -175,6 +207,9 @@ public class VertexPair {
             Vector<Vertex> Path = new Vector<Vertex>();
             Path.setSize(visitedNodes.size());
             Collections.copy(Path, visitedNodes);
+            // A neighbour can appear in more than one neighbour list (e.g. {u,v} and (u,v));
+            // the width is vertex-based, so keep each vertex sequence once (ADR 0002).
+            if (pathList.contains(Path)) return;
             pathList.add(Path);
             for (Vertex a : Path) {
                 System.out.print("-" + a.name);

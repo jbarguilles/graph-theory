@@ -41,6 +41,65 @@ A set of vertices and edges. This project supports **mixed graphs** — graphs c
 
 ---
 
+## Walk
+
+An alternating sequence of vertices and edges v₀, e₁, v₁, e₂, …, eₖ, vₖ, where each edge eᵢ joins vᵢ₋₁ to vᵢ. A walk is defined by its **edges**, not only its vertices, because a mixed graph can have more than one edge between the same pair of vertices (e.g. {a, b} and (a, b)).
+
+- An **undirected edge** can be traversed in either direction.
+- A **directed edge** can only be traversed from its source to its destination.
+- A **self-loop** is one step from a vertex back to itself.
+
+**Length** — the number of edges in the walk (k), counting repeats.
+
+_Avoid_: using a vertex sequence alone as a walk; it is ambiguous when parallel edges exist.
+
+Two walks with the same vertex sequence but different edges are **different walks** (and likewise different trails/paths).
+
+**Trivial walk** — a single vertex, length 0. It counts as a walk, trail and path, but is **not** closed.
+
+### Kinds of Walk
+
+Each is a restriction of the one before it:
+
+- **Trail** — a walk with no repeated edge.
+- **Path** — a walk with no repeated vertex. Every path is a trail.
+- **Closed walk** — a walk of length ≥ 1 with v₀ = vₖ.
+- **Circuit** — a closed walk that is also a trail.
+- **Cycle** — a circuit whose only repeated vertex is v₀ = vₖ.
+
+Edge cases:
+- A self-loop traversed once is a cycle of length 1.
+- a → b → a using the same undirected edge twice is not a trail, so not a cycle. Going out on {a, b} and back on the arc (b, a) is a cycle of length 2.
+
+**Distance** (geodesic distance) — from u to v, the length of the shortest walk from u to v. It belongs to a pair of vertices, not to a walk. A shortest u–v path is a **geodesic**; there may be more than one.
+
+_Avoid_: "distance" for the length of a particular walk — use **Length**.
+
+_Avoid_: "Tour" for a closed trail — use **Circuit**. "Tour" is reserved for an **Euler tour**.
+
+### Euler Trail and Euler Tour
+
+- **Euler trail** — a trail that uses every edge of the graph exactly once.
+- **Euler tour** — an Euler trail that is closed (a circuit using every edge exactly once).
+
+Like any walk, it must respect direction: a directed edge is crossed only from its source to its destination, and an undirected edge may be crossed either way (but still only once). Isolated vertices do not matter; every edge must be reachable from the trail.
+
+In a graph with no edges, the trivial walk is an Euler trail but not an Euler tour (it is not closed). A graph with no vertices has neither.
+
+_Avoid_: "Euler path" — an Euler trail may repeat vertices, so it is generally not a **Path**. "Euler circuit" is an acceptable synonym for Euler tour.
+
+### Hamiltonian Path and Hamiltonian Cycle
+
+- **Hamiltonian path** — a path that visits every vertex of the graph.
+- **Hamiltonian cycle** — a cycle that visits every vertex of the graph.
+
+They follow the walk rules exactly, including direction, so there is no minimum number of vertices:
+- A single vertex with no edges has a Hamiltonian path (the trivial walk) but no Hamiltonian cycle.
+- A single vertex with a self-loop has a Hamiltonian cycle of length 1.
+- Two vertices joined by {a, b} and (b, a) have a Hamiltonian cycle of length 2. Joined by {a, b} alone, they do not.
+
+---
+
 ## Display Conventions
 
 - **Graph window**: clicking a vertex shows its node properties in a fixed info box (degree, in-degree, out-degree, isolated, cutpoint, root).
