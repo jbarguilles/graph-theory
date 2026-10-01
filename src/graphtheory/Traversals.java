@@ -299,6 +299,10 @@ public class Traversals {
 
     // ---------- Hamiltonian ----------
 
+    /**
+     * True if the graph has more vertices than HAMILTON_VERTEX_CAP.
+     * Above the cap, hamiltonianPath and hamiltonianCycle return null without searching.
+     */
     public static boolean hamiltonTooLarge(Vector<Vertex> vList) {
         return vList.size() > HAMILTON_VERTEX_CAP;
     }
@@ -306,27 +310,34 @@ public class Traversals {
     /** A path visiting every vertex, or null. */
     public static Walk hamiltonianPath(Vector<Vertex> vList, Vector<Edge> eList) {
         if (vList.isEmpty() || hamiltonTooLarge(vList)) return null;
-        for (Vertex s : vList) {
-            Walk w = new Walk(s);
-            if (extendHamiltonian(w, vList.size(), eList, false)) return w;
+        if (vList.size() <= 2) {
+            for (Vertex s : vList) {
+                Walk w = new Walk(s);
+                if (extendHamiltonian(w, vList, eList, false)) return w;
+            }
+            return null;
         }
-        return null;
+        return hamiltonDP(vList, eList, false);
     }
 
     /** A cycle visiting every vertex, or null. A cycle passes every vertex, so starting at the first is enough. */
     public static Walk hamiltonianCycle(Vector<Vertex> vList, Vector<Edge> eList) {
         if (vList.isEmpty() || hamiltonTooLarge(vList)) return null;
-        Walk w = new Walk(vList.firstElement());
-        return extendHamiltonian(w, vList.size(), eList, true) ? w : null;
+        if (vList.size() <= 2) {
+            Walk w = new Walk(vList.firstElement());
+            return extendHamiltonian(w, vList, eList, true) ? w : null;
+        }
+        return hamiltonDP(vList, eList, true);
     }
 
     /**
-     * Backtracking over edges, not neighbour sets: which edge is used matters
-     * for closing a cycle (e.g. {a,b} + (a,b) only closes if (a,b) goes first).
+     * Edge-aware backtracking, used only for 1 or 2 vertices. There, which edge
+     * is used matters for closing a cycle (e.g. {a,b} + (a,b) only closes if
+     * (a,b) goes first), and the search is trivially small.
      */
-    private static boolean extendHamiltonian(Walk w, int n, Vector<Edge> eList, boolean closed) {
+    private static boolean extendHamiltonian(Walk w, Vector<Vertex> vList, Vector<Edge> eList, boolean closed) {
         Vertex at = w.end();
-        if (w.vertices().size() == n) {
+        if (w.vertices().size() == vList.size()) {
             if (!closed) return true;
             for (Edge e : eList) {
                 if (Walk.canTraverse(e, at) && Walk.otherEnd(e, at) == w.start() && !w.uses(e)) {
@@ -337,12 +348,88 @@ public class Traversals {
             return false;
         }
         for (Edge e : eList) {
-            if (!Walk.canTraverse(e, at) || w.visits(Walk.otherEnd(e, at))) continue;
+            if (!Walk.canTraverse(e, at)) continue;
+            Vertex next = Walk.otherEnd(e, at);
+            if (w.visits(next) || !vList.contains(next)) continue;
             w.extend(e);
-            if (extendHamiltonian(w, n, eList, closed)) return true;
+            if (extendHamiltonian(w, vList, eList, closed)) return true;
             w.undo();
         }
         return false;
+    }
+
+    /**
+     * Bitmask dynamic programming for 3 or more vertices (Held-Karp style).
+     * Number the vertices 0..n-1; a set of vertices is an int whose bit i means
+     * "vertex i is in the set". reach[mask] is the set of vertices v such that
+     * some path visits exactly the vertices in mask and ends at v.
+     * A path through mask ending at v exists exactly when a path through
+     * mask-without-v ends at some u with a step u -> v, so each reach[mask]
+     * is built from smaller masks. That is about 2^n * n steps instead of
+     * trying all n! orders.
+     * With 3+ vertices a path or cycle never needs the same edge twice, so we
+     * only track vertices and pick a concrete edge for each step at the end.
+     */
+    private static Walk hamiltonDP(Vector<Vertex> vList, Vector<Edge> eList, boolean closed) {
+        int n = vList.size();
+        Map<Vertex, Integer> index = new HashMap<Vertex, Integer>();
+        for (int i = 0; i < n; i++) index.put(vList.get(i), i);
+
+        // into[v] = set of vertices u (u != v) with a one-step move u -> v.
+        // Self-loops and edges leaving vList are ignored.
+        int[] into = new int[n];
+        for (Edge e : eList) {
+            Integer x = index.get(e.vertex1), y = index.get(e.vertex2);
+            if (x == null || y == null || x.intValue() == y.intValue()) continue;
+            into[y] |= 1 << x;                    // x -> y
+            if (!e.directed) into[x] |= 1 << y;   // y -> x too
+        }
+
+        int full = (1 << n) - 1;
+        int[] reach = new int[1 << n];
+        // A path may start anywhere; a cycle can be rotated to start at vertex 0.
+        if (closed) reach[1] = 1;
+        else for (int i = 0; i < n; i++) reach[1 << i] = 1 << i;
+
+        for (int mask = 1; mask <= full; mask++) {
+            if ((mask & (mask - 1)) == 0) continue;   // single vertex: already seeded
+            int ends = 0;
+            for (int v = 0; v < n; v++) {
+                int bit = 1 << v;
+                if ((mask & bit) != 0 && (reach[mask ^ bit] & into[v]) != 0) ends |= bit;
+            }
+            reach[mask] = ends;
+        }
+
+        // Choose the last vertex: any end for a path, one that steps back to 0 for a cycle.
+        int last = -1;
+        for (int v = 0; v < n && last < 0; v++) {
+            if ((reach[full] & (1 << v)) == 0) continue;
+            if (!closed || (into[0] & (1 << v)) != 0) last = v;
+        }
+        if (last < 0) return null;
+
+        // Walk backwards: the vertex before v is any u that could end the path
+        // through mask-without-v and has a step u -> v.
+        int[] order = new int[n];
+        int mask = full, v = last;
+        for (int k = n - 1; k > 0; k--) {
+            order[k] = v;
+            int rest = mask ^ (1 << v);
+            int prev = Integer.numberOfTrailingZeros(reach[rest] & into[v]);
+            mask = rest;
+            v = prev;
+        }
+        order[0] = v;
+
+        Walk w = new Walk(vList.get(order[0]));
+        for (int k = 1; k < n; k++) {
+            w.extend(Walk.edgesBetween(vList.get(order[k - 1]), vList.get(order[k]), eList).firstElement());
+        }
+        if (closed) {
+            w.extend(Walk.edgesBetween(vList.get(order[n - 1]), vList.get(order[0]), eList).firstElement());
+        }
+        return w;
     }
 
     /** True if every edge lies in one connected piece (direction ignored). */

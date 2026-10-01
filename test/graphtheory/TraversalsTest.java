@@ -284,6 +284,7 @@ public class TraversalsTest {
         assertNotNull(w);
         assertTrue(w.isPath());
         assertEquals(vList.size(), w.vertices().size());
+        for (Vertex v : vList) assertTrue(w.visits(v));
     }
 
     /** w is a cycle through every vertex of vList. */
@@ -382,5 +383,46 @@ public class TraversalsTest {
         }
         assertTrue(Traversals.hamiltonTooLarge(vList));
         assertNull(Traversals.hamiltonianPath(vList, eList));
+    }
+
+    private void complete(Vertex[] k) {
+        for (int i = 0; i < k.length; i++)
+            for (int j = i + 1; j < k.length; j++) und(k[i], k[j]);
+    }
+
+    @Test(timeout = 2000)
+    public void k11PlusIsolatedVertex_noHamiltonianPathOrCycle_fast() {
+        Vertex[] k = new Vertex[11];
+        for (int i = 0; i < 11; i++) { k[i] = new Vertex("k" + i, 0, 0); vList.add(k[i]); }
+        complete(k);
+        vList.add(new Vertex("lonely", 0, 0));
+        assertNull(Traversals.hamiltonianPath(vList, eList));
+        assertNull(Traversals.hamiltonianCycle(vList, eList));
+    }
+
+    @Test(timeout = 2000)
+    public void k7_8_hasHamiltonianPath_noCycle_fast() {
+        Vertex[] left = new Vertex[7], right = new Vertex[8];
+        for (int i = 0; i < 7; i++) { left[i] = new Vertex("l" + i, 0, 0); vList.add(left[i]); }
+        for (int i = 0; i < 8; i++) { right[i] = new Vertex("r" + i, 0, 0); vList.add(right[i]); }
+        for (Vertex l : left) for (Vertex r : right) und(l, r);
+        assertHamiltonianPath(Traversals.hamiltonianPath(vList, eList));
+        assertNull(Traversals.hamiltonianCycle(vList, eList));
+    }
+
+    @Test(timeout = 2000)
+    public void k20_hasHamiltonianCycle_atCap_fast() {
+        Vertex[] k = new Vertex[20];
+        for (int i = 0; i < 20; i++) { k[i] = new Vertex("k" + i, 0, 0); vList.add(k[i]); }
+        complete(k);
+        assertHamiltonianCycle(Traversals.hamiltonianCycle(vList, eList));
+    }
+
+    @Test
+    public void directedCycleOfFour_followsArcs() {
+        vertices(a, b, c, d);
+        arc(a, b); arc(b, c); arc(c, d); arc(d, a); arc(a, c);
+        Walk w = Traversals.hamiltonianCycle(vList, eList);
+        assertHamiltonianCycle(w);
     }
 }
