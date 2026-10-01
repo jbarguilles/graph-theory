@@ -214,7 +214,7 @@ public class Canvas {
         int rightHeight = 50
                 + matrixHeight + 20
                 + matrixHeight + 20
-                + 24 * 16 + 20;
+                + 28 * 16 + 20;
         int leftHeight = 10
                        + height / 2 + 20
                        + (vertexList.size() + 2) * 18 + 30       // node table
@@ -267,16 +267,17 @@ public class Canvas {
     }
 
     private void recomputeGraphProperties() {
-        if (!graphDirty) return;
-        if (vertexList.size() > 0) {
-            gP.computeCutpoints(vertexList);
-            gP.computeBridges(vertexList, edgeList);
-        } else {
-            for (Vertex v : vertexList) v.isCutpoint = false;
-            for (Edge e : edgeList)   e.isBridge   = false;
-        }
-        graphDirty = false;
+    if (!graphDirty) return;
+    if (vertexList.size() > 0) {
+        gP.computeCutpoints(vertexList);
+        gP.computeBridges(vertexList, edgeList);
+        gP.computeBlocks(vertexList, edgeList);   // <-- NEW
+    } else {
+        for (Vertex v : vertexList) v.isCutpoint = false;
+        for (Edge e : edgeList)   e.isBridge   = false;
     }
+    graphDirty = false;
+}
 
     private Set<Vertex> connectedComponentOf(Vertex start) {
         Set<Vertex> visited = new HashSet<Vertex>();

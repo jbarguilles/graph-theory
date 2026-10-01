@@ -25,7 +25,7 @@ import java.util.Vector;
 public class GraphProperties {
 
     public int[][] adjacencyMatrix;
-    public int[][] weightedAdjacencyMatrix;   // 0 = no edge, else weight
+    public int[][] weightedAdjacencyMatrix;
     public int[][] distanceMatrix;
     public Vector<VertexPair> vpList;
 
@@ -34,6 +34,12 @@ public class GraphProperties {
 
     public Vector<Edge> witnessEdges = new Vector<Edge>();
     public int edgeConnectivityValue = 0;
+
+    /** Number of blocks computed by the last call to computeBlocks(). */
+    public int blockCount = 0;
+
+    /** List of blocks computed by the last call to computeBlocks(). */
+    public Vector<Vector<Edge>> blockList = new Vector<Vector<Edge>>();
 
     public int[][] generateAdjacencyMatrix(Vector<Vertex> vList, Vector<Edge> eList) {
         adjacencyMatrix = new int[vList.size()][vList.size()];
@@ -188,75 +194,64 @@ public class GraphProperties {
     }
 
     /**
- * Draws the adjacency list representation of the graph.
- * For each vertex, lists its undirected neighbors, out-neighbors, and
- * in-neighbors. Empty categories are omitted, so a purely undirected
- * graph shows just the undirected bracket, a purely directed graph shows
- * "out:(...)" and/or "in:(...)".
- *
- * Returns the total height used (pixels), so callers can stack another
- * panel below it.
- */
-public int drawAdjacencyList(Graphics g, Vector<Vertex> vList, int x, int y) {
-    int rowH = 18;
-
-    g.setColor(Color.BLACK);
-    g.drawString("Adjacency List", x, y - 5);
-
-    int ty = y + rowH;
-    for (Vertex v : vList) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(v.name).append(" : ");
-
-        boolean wroteSomething = false;
-
-        // Undirected neighbors
-        if (!v.undirectedNeighbors.isEmpty()) {
-            sb.append("[");
-            for (int i = 0; i < v.undirectedNeighbors.size(); i++) {
-                if (i > 0) sb.append(", ");
-                sb.append(v.undirectedNeighbors.get(i).name);
-            }
-            sb.append("]");
-            wroteSomething = true;
-        }
-
-        // Out-neighbors (directed)
-        if (!v.outNeighbors.isEmpty()) {
-            if (wroteSomething) sb.append("  ");
-            sb.append("out:(");
-            for (int i = 0; i < v.outNeighbors.size(); i++) {
-                if (i > 0) sb.append(", ");
-                sb.append(v.outNeighbors.get(i).name);
-            }
-            sb.append(")");
-            wroteSomething = true;
-        }
-
-        // In-neighbors (directed)
-        if (!v.inNeighbors.isEmpty()) {
-            if (wroteSomething) sb.append("  ");
-            sb.append("in:(");
-            for (int i = 0; i < v.inNeighbors.size(); i++) {
-                if (i > 0) sb.append(", ");
-                sb.append(v.inNeighbors.get(i).name);
-            }
-            sb.append(")");
-            wroteSomething = true;
-        }
-
-        // Isolated vertex — nothing above was written
-        if (!wroteSomething) {
-            sb.append("(isolated)");
-        }
+     * Draws the adjacency list representation. Returns total height in pixels.
+     */
+    public int drawAdjacencyList(Graphics g, Vector<Vertex> vList, int x, int y) {
+        int rowH = 18;
 
         g.setColor(Color.BLACK);
-        g.drawString(sb.toString(), x + 4, ty);
-        ty += rowH;
-    }
+        g.drawString("Adjacency List", x, y - 5);
 
-    return (vList.size() + 1) * rowH + 6;
-}
+        int ty = y + rowH;
+        for (Vertex v : vList) {
+            StringBuilder sb = new StringBuilder();
+            sb.append(v.name).append(" : ");
+
+            boolean wroteSomething = false;
+
+            if (!v.undirectedNeighbors.isEmpty()) {
+                sb.append("[");
+                for (int i = 0; i < v.undirectedNeighbors.size(); i++) {
+                    if (i > 0) sb.append(", ");
+                    sb.append(v.undirectedNeighbors.get(i).name);
+                }
+                sb.append("]");
+                wroteSomething = true;
+            }
+
+            if (!v.outNeighbors.isEmpty()) {
+                if (wroteSomething) sb.append("  ");
+                sb.append("out:(");
+                for (int i = 0; i < v.outNeighbors.size(); i++) {
+                    if (i > 0) sb.append(", ");
+                    sb.append(v.outNeighbors.get(i).name);
+                }
+                sb.append(")");
+                wroteSomething = true;
+            }
+
+            if (!v.inNeighbors.isEmpty()) {
+                if (wroteSomething) sb.append("  ");
+                sb.append("in:(");
+                for (int i = 0; i < v.inNeighbors.size(); i++) {
+                    if (i > 0) sb.append(", ");
+                    sb.append(v.inNeighbors.get(i).name);
+                }
+                sb.append(")");
+                wroteSomething = true;
+            }
+
+            if (!wroteSomething) {
+                sb.append("(isolated)");
+            }
+
+            g.setColor(Color.BLACK);
+            g.drawString(sb.toString(), x + 4, ty);
+            ty += rowH;
+        }
+
+        return (vList.size() + 1) * rowH + 6;
+    }
 
     // ---- Bridge detection (Tarjan) ----
 
@@ -297,6 +292,159 @@ public int drawAdjacencyList(Graphics g, Vector<Vertex> vList, int x, int y) {
                 (!e.directed && e.vertex1 == b && e.vertex2 == a)) return i;
         }
         return -1;
+    }
+
+    // ---- Block / biconnected component (Tarjan stack-based) ----
+
+    public Vector<Vector<Edge>> computeBlocks(Vector<Vertex> vList, Vector<Edge> eList) {
+        int n = vList.size();
+        int[] disc = new int[n];
+        int[] low = new int[n];
+        int[] parent = new int[n];
+        boolean[] visited = new boolean[n];
+        int[] timer = {0};
+        Arrays.fill(disc, -1);
+        Arrays.fill(parent, -1);
+
+        Vector<Vector<Edge>> blocks = new Vector<Vector<Edge>>();
+        Vector<Edge> edgeStack = new Vector<Edge>();
+
+        for (int i = 0; i < n; i++) {
+            if (!visited[i]) {
+                dfsBlock(i, vList, eList, disc, low, parent, visited, timer,
+                         edgeStack, blocks);
+            }
+        }
+
+        if (!edgeStack.isEmpty()) {
+            Vector<Edge> last = new Vector<Edge>(edgeStack);
+            blocks.add(last);
+            edgeStack.clear();
+        }
+
+        for (int b = 0; b < blocks.size(); b++) {
+            for (Edge e : blocks.get(b)) {
+                e.blockId = b;
+            }
+        }
+        this.blockCount = blocks.size();
+        this.blockList = blocks;
+        return blocks;
+    }
+
+    private void dfsBlock(int u, Vector<Vertex> vList, Vector<Edge> eList,
+                          int[] disc, int[] low, int[] parent, boolean[] visited, int[] timer,
+                          Vector<Edge> edgeStack, Vector<Vector<Edge>> blocks) {
+        visited[u] = true;
+        disc[u] = low[u] = timer[0]++;
+        int children = 0;
+
+        for (int v : getAllNeighborIndices(u, vList)) {
+            if (v == u) continue;
+            Edge e = findEdge(vList.get(u), vList.get(v), eList);
+            if (e == null) continue;
+
+            if (!visited[v]) {
+                children++;
+                parent[v] = u;
+                edgeStack.add(e);
+                dfsBlock(v, vList, eList, disc, low, parent, visited, timer,
+                         edgeStack, blocks);
+                low[u] = Math.min(low[u], low[v]);
+
+                boolean isRootWithTwo = (parent[u] == -1 && children > 1);
+                boolean isArticulation = (parent[u] != -1 && low[v] >= disc[u]);
+                if (isRootWithTwo || isArticulation) {
+                    Vector<Edge> block = new Vector<Edge>();
+                    while (!edgeStack.isEmpty()) {
+                        Edge top = edgeStack.remove(edgeStack.size() - 1);
+                        block.add(top);
+                        if (top == e) break;
+                    }
+                    blocks.add(block);
+                }
+            } else if (v != parent[u] && disc[v] < disc[u]) {
+                edgeStack.add(e);
+                low[u] = Math.min(low[u], disc[v]);
+            }
+        }
+    }
+
+    private Edge findEdge(Vertex a, Vertex b, Vector<Edge> eList) {
+        for (Edge e : eList) {
+            if (e.vertex1 == a && e.vertex2 == b) return e;
+            if (!e.directed && e.vertex1 == b && e.vertex2 == a) return e;
+        }
+        return null;
+    }
+
+    /** Returns the set of distinct vertices contained in a block. */
+    public Set<Vertex> blockVertices(Vector<Edge> block) {
+        Set<Vertex> s = new HashSet<Vertex>();
+        for (Edge e : block) {
+            s.add(e.vertex1);
+            s.add(e.vertex2);
+        }
+        return s;
+    }
+
+    /** Number of blocks with 3 or more vertices. */
+    public int countNontrivialBlocks() {
+        int count = 0;
+        for (Vector<Edge> block : blockList) {
+            if (blockVertices(block).size() >= 3) count++;
+        }
+        return count;
+    }
+
+    /** A block is by definition maximal; this just reports whether any exist. */
+    public boolean hasMaximalBlocks() {
+        return blockCount > 0;
+    }
+
+    /**
+     * Formats the block list as "{a, b, c}, {d, e}, ...".
+     * Truncates to maxLen characters if the string would be longer.
+     */
+    public String formatBlocks(int maxLen) {
+        if (blockList.isEmpty()) return "\u2014";
+        StringBuilder sb = new StringBuilder();
+        for (int b = 0; b < blockList.size(); b++) {
+            if (b > 0) sb.append(", ");
+            Vector<Edge> block = blockList.get(b);
+            Set<Vertex> verts = blockVertices(block);
+
+            // Order by position in vertexList for a stable reading order.
+            List<Vertex> ordered = new ArrayList<Vertex>(verts);
+            ordered.sort(new Comparator<Vertex>() {
+                public int compare(Vertex a, Vertex c) {
+                    return a.name.compareTo(c.name);
+                }
+            });
+
+            sb.append("{");
+            for (int i = 0; i < ordered.size(); i++) {
+                if (i > 0) sb.append(", ");
+                sb.append(ordered.get(i).name);
+            }
+            sb.append("}");
+        }
+        String result = sb.toString();
+        if (result.length() > maxLen) {
+            result = result.substring(0, Math.max(0, maxLen - 3)) + "...";
+        }
+        return result;
+    }
+
+    /**
+     * True if the graph is nonseparable: connected and has no cut vertices.
+     * A single vertex or empty graph is trivially nonseparable.
+     */
+    public boolean isNonseparable(Vector<Vertex> vList) {
+        if (vList.size() < 2) return true;
+        if (!isConnected(vList)) return false;
+        for (Vertex v : vList) if (v.isCutpoint) return false;
+        return true;
     }
 
     // ---- Connectivity ----
@@ -439,38 +587,21 @@ public int drawAdjacencyList(Graphics g, Vector<Vertex> vList, int x, int y) {
 
     // ---- Simple / Multigraph ----
 
-    /**
-     * True if the graph is simple:
-     *   - no self-loops,
-     *   - no parallel edges (same pair joined by more than one edge in the
-     *     same direction),
-     *   - no mixing of a directed and an undirected edge on the same pair.
-     *
-     * Antiparallel directed arcs (u→v and v→u) are allowed — they are
-     * different ordered pairs and do not break simplicity.
-     *
-     * In practice, the UI prevents parallel edges, so this is almost always
-     * true. It exists to be honest if a malformed file introduces duplicates.
-     */
     public boolean isSimple(Vector<Vertex> vList, Vector<Edge> eList) {
-        // 1) No self-loops
         for (Edge e : eList) {
             if (e.vertex1 == e.vertex2) return false;
         }
 
-        // 2) No parallel edges and no mixed edge/arc on the same pair
         for (int i = 0; i < eList.size(); i++) {
             Edge a = eList.get(i);
             for (int j = i + 1; j < eList.size(); j++) {
                 Edge b = eList.get(j);
 
-                // Both directed, same ordered pair → parallel
                 if (a.directed && b.directed
                         && a.vertex1 == b.vertex1 && a.vertex2 == b.vertex2) {
                     return false;
                 }
 
-                // Both undirected, same unordered pair → parallel
                 if (!a.directed && !b.directed) {
                     boolean same =
                             (a.vertex1 == b.vertex1 && a.vertex2 == b.vertex2) ||
@@ -478,7 +609,6 @@ public int drawAdjacencyList(Graphics g, Vector<Vertex> vList, int x, int y) {
                     if (same) return false;
                 }
 
-                // Mixed: one directed, one undirected, same unordered pair
                 if (a.directed != b.directed) {
                     boolean same =
                             (a.vertex1 == b.vertex1 && a.vertex2 == b.vertex2) ||
@@ -813,7 +943,7 @@ public int drawAdjacencyList(Graphics g, Vector<Vertex> vList, int x, int y) {
         return "No";
     }
 
-    // ---- Connectivity for Euler checks (isolated vertices ignored) ----
+    // ---- Connectivity for Euler checks ----
 
     private boolean isConnectedIgnoringIsolated(Vector<Vertex> vList) {
         if (vList.isEmpty()) return true;
@@ -960,6 +1090,24 @@ public int drawAdjacencyList(Graphics g, Vector<Vertex> vList, int x, int y) {
                 ? "\u2014"
                 : (isAcyclic(vList) ? "Acyclic" : "Cyclic");
 
+        String nontrivialCount = vList.isEmpty()
+                ? "0"
+                : ("" + countNontrivialBlocks());
+
+        String blocksStr = vList.isEmpty()
+                ? "\u2014"
+                : ("" + blockCount + " ("
+                    + countNontrivialBlocks() + " nontrivial)");
+
+        // Long line listing each block's vertex set.
+        String blockVerticesStr = vList.isEmpty()
+                ? "\u2014"
+                : formatBlocks(160);
+
+        String nonsepStr = vList.size() < 2
+                ? "\u2014"
+                : (isNonseparable(vList) ? "Yes" : "No");
+
         String[] lines = {
             "Graph Summary",
             "Order |V|: " + order,
@@ -978,6 +1126,10 @@ public int drawAdjacencyList(Graphics g, Vector<Vertex> vList, int x, int y) {
             "Complete: " + completeStr,
             "Simple: " + simpleStr,
             "Cyclic/Acyclic: " + cyclicStr,
+            "Blocks: " + blocksStr,
+            "Nontrivial blocks: " + nontrivialCount,
+            "Nonseparable: " + nonsepStr,
+            "Block vertices: " + blockVerticesStr,
             "Bridges: " + bridgeCount + (bridgeCount > 0 ? " (purple)" : ""),
             "Euler Circuit: " + (eulerCircuit ? "Yes" : "No"),
             "Euler Path (Trail): " + (eulerPath ? "Yes" : "No"),
@@ -988,7 +1140,7 @@ public int drawAdjacencyList(Graphics g, Vector<Vertex> vList, int x, int y) {
         };
 
         int rowH = 16;
-        int w = 420;
+        int w = 520;
         int h = lines.length * rowH + 6;
 
         g.setColor(new Color(255, 255, 220));
