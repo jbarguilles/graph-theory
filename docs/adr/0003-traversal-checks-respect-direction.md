@@ -7,5 +7,6 @@ Euler trail/tour and Hamiltonian path/cycle are defined as kinds of walk (CONTEX
 ## Consequences
 
 - One search function per concept returns the walk it found (or none). The Graph Summary's Yes/No and the "Find …" menu items both call it, so they can never disagree.
-- Purely undirected or purely directed graphs use degree conditions + Hierholzer (no size cap). Mixed graphs use exponential backtracking, capped (≈30 edges for Euler, 20 vertices for Hamiltonian), and show "> cap" beyond that.
+- Euler search is exact and polynomial for every graph, with no size cap: purely undirected or purely directed graphs use degree conditions + Hierholzer; mixed graphs first orient their undirected edges with a max-flow so every vertex balances, then run Hierholzer. Backtracking with a 30-edge cap was tried first and rejected: graphs of ~22 edges that pass the parity test but have no Euler trail took minutes.
+- Hamiltonian search stays exponential backtracking, capped at 20 vertices ("> 20 vertices" beyond that). The Graph Summary caches its answers and recomputes them only after the graph changes, not on every repaint.
 - Small cases follow the glossary literally, not textbook convention: a self-loop or {a,b}+(b,a) can be a Hamiltonian cycle; an edgeless graph has an Euler trail (trivial walk) but no Euler tour.

@@ -4,7 +4,7 @@
 
 **Goal:** Make the Euler trail/tour and Hamiltonian path/cycle checks respect arc direction and the glossary's small cases, and add four "Find …" menu items that load the walk found into the Build Walk tool.
 
-**Architecture:** A new pure-logic class `Traversals` has one search function per concept. Each returns the edge-aware `Walk` it found, or `null`. The Graph Summary's Yes/No and the Find menu items both call these functions, so they can never disagree. Euler uses degree conditions + Hierholzer for purely undirected or purely directed graphs (no cap) and backtracking for mixed graphs (capped at 30 edges). Hamiltonian uses edge-aware backtracking (capped at 20 vertices). The searches work from the **edge list**, not the vertex neighbour lists. (`Canvas` rebuilds `undirectedNeighbors` from the adjacency matrix when Properties opens, so the edge list is the reliable source.)
+**Architecture:** A new pure-logic class `Traversals` has one search function per concept. Each returns the edge-aware `Walk` it found, or `null`. The Graph Summary's Yes/No and the Find menu items both call these functions, so they can never disagree. Euler is exact with no cap: degree conditions + Hierholzer for purely undirected or purely directed graphs, and a max-flow orientation of the undirected edges followed by Hierholzer for mixed graphs (Task 1b). The Graph Summary caches its answers per graph change. Hamiltonian uses edge-aware backtracking (capped at 20 vertices). The searches work from the **edge list**, not the vertex neighbour lists. (`Canvas` rebuilds `undirectedNeighbors` from the adjacency matrix when Properties opens, so the edge list is the reliable source.)
 
 **Tech Stack:** Java 17 (source-compatible with Java 7+, so no lambdas), Swing/AWT, JUnit 4.13.2.
 
@@ -507,6 +507,157 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
+## Task 1b: Exact mixed-graph Euler search (replaces the capped backtracking)
+
+> **Added after review.** Task 1's mixed-graph backtracking gave correct answers: it was fuzzed against brute force on 200,000 random graphs with 0 mismatches. But it hangs on graphs that pass the parity test and have no trail. Seven triangles sharing a hub plus two arcs `h→x` (23 edges) took 9 s, and K7 minus an edge plus two arcs (22 edges) took over 120 s. The user chose the exact polynomial method. ADR 0003 is updated accordingly.
+
+**Files:**
+- Modify: `src/graphtheory/Traversals.java`
+- Modify: `test/graphtheory/TraversalsTest.java`
+
+**Design (implement exactly this):**
+
+1. **Remove** `EULER_MIXED_EDGE_CAP`, `eulerTooLarge`, `extendEuler` and the backtracking body of `eulerMixed`. Euler search no longer has a cap. Keep the `euler(...)` entry flow: no vertices → null; no edges → trivial trail / no tour; not connected → null.
+2. **Generalise `hierholzer`** to `hierholzer(Vertex start, Vector<Edge> eList, Vertex[] tail)`. `tail[i]` is the only vertex edge i may be left from, or `null` if it may be left from either end. Replace `Walk.canTraverse(e, v)` in `nextUnusedEdge` with that rule: `tail[i] == null ? (e.vertex1 == v || e.vertex2 == v) : tail[i] == v`. Purely undirected and purely directed graphs pass `tail[i] = e.directed ? e.vertex1 : null`; add a small helper for this. Still build the result with `Walk.extend`, which re-checks the real direction rules.
+3. **Mixed Euler tour** (private `mixedTour(eList)`, for a connected mixed edge list where every vertex has an even number of edge-ends):
+   - For each vertex v, `need(v) = ends(v)/2 − loops(v) − arcsOut(v)`. Here `ends` counts edge-ends ignoring direction, so a self-loop counts 2. `loops` counts self-loops of either kind. `arcsOut` counts non-loop arcs leaving v. If any `need(v) < 0`, return null.
+   - Every non-loop undirected edge must be assigned to the endpoint it will leave from, with exactly `need(v)` edges assigned to each v. Solve this as a bipartite b-matching (unit-capacity max-flow) using augmenting paths:
+     - For each such edge, DFS for an augmenting path. An edge can take an endpoint with spare capacity directly, or take an endpoint whose assigned edges include one that can be moved to its other endpoint, recursively, with a visited set per augmentation.
+     - If any edge can't be assigned, return null.
+   - Build `tail`: arcs get `vertex1`, assigned undirected edges get their assigned endpoint, and self-loops get their vertex. Run `hierholzer(eList.firstElement().vertex1, eList, tail)`.
+4. **Mixed Euler trail** (`closed == false`):
+   - 0 odd vertices: return `mixedTour(eList)`. Any closed trail is a trail, and an open Euler trail can't exist when every count is even.
+   - Exactly 2 odd vertices x, y: add a **virtual** undirected `new Edge(x, y, false)` to a copy of `eList` and run `mixedTour` on the copy. If that returns a walk, cut it at the virtual edge: the trail starts at the vertex right after the virtual edge and follows the remaining edges cyclically, back to the vertex right before it. Rebuild it with `new Walk(...)` + `extend` so the virtual edge never appears in the result.
+   - Otherwise return null.
+5. Leave the pure undirected and pure directed paths (degree tests + Hierholzer) as they are, except for passing `tail`.
+6. Fix comments as needed: one start suffices for a closed trail because a closed trail can be rotated. Javadoc on `eulerTrail`/`eulerTour`: "exact for any size; returns null only when none exists".
+
+**Tests (TDD: write first, then implement):**
+- Delete `mixedOverEdgeCap_isTooLarge_butPureUndirectedIsNot`.
+- Add:
+
+```java
+    @Test(timeout = 2000)
+    public void windmillWithTwoTrappingArcs_noEulerTrail_fast() {
+        // 9 triangles sharing hub h, plus arcs h->x twice: every vertex has
+        // even edge-ends, but x can't be left. Backtracking took minutes here.
+        Vertex h = new Vertex("h", 0, 0), x = new Vertex("x", 0, 0);
+        vList.add(h); vList.add(x);
+        for (int i = 0; i < 9; i++) {
+            Vertex p = new Vertex("p" + i, 0, 0), q = new Vertex("q" + i, 0, 0);
+            vList.add(p); vList.add(q);
+            und(h, p); und(p, q); und(q, h);
+        }
+        arc(h, x); arc(h, x);
+        assertNull(Traversals.eulerTrail(vList, eList));
+        assertNull(Traversals.eulerTour(vList, eList));
+    }
+
+    @Test(timeout = 2000)
+    public void k7MinusEdgePlusTwoArcs_noEulerTour_fast() {
+        Vertex[] k = new Vertex[7];
+        for (int i = 0; i < 7; i++) { k[i] = new Vertex("k" + i, 0, 0); vList.add(k[i]); }
+        for (int i = 0; i < 7; i++)
+            for (int j = i + 1; j < 7; j++)
+                if (!(i == 0 && j == 1)) und(k[i], k[j]);
+        Vertex x = new Vertex("x", 0, 0);
+        vList.add(x);
+        arc(x, k[0]); arc(x, k[1]);
+        assertNull(Traversals.eulerTour(vList, eList));
+    }
+
+    @Test(timeout = 2000)
+    public void largeMixedCycle_hasEulerTour_noCap() {
+        Vertex[] vs = new Vertex[60];
+        for (int i = 0; i < 60; i++) { vs[i] = new Vertex("v" + i, 0, 0); vList.add(vs[i]); }
+        for (int i = 0; i < 60; i++) {
+            if (i % 2 == 0) arc(vs[i], vs[(i + 1) % 60]); else und(vs[i], vs[(i + 1) % 60]);
+        }
+        Walk w = Traversals.eulerTour(vList, eList);
+        assertEulerTrail(w);
+        assertTrue(w.isCircuit());
+    }
+
+    @Test
+    public void mixedTrail_mustStartAtSecondOddVertex() {
+        // Odd vertices are a (first in vList) and c; the arc forces c -> b -> a.
+        vertices(a, b, c);
+        arc(c, b); und(b, a);
+        Walk w = Traversals.eulerTrail(vList, eList);
+        assertEulerTrail(w);
+        assertSame(c, w.start());
+        assertSame(a, w.end());
+    }
+
+    @Test
+    public void mixedUndirectedEdgesMustBeOrientedConsistently() {
+        // Square with arcs (a,b), (c,d) and undirected {b,c}, {d,a}.
+        // The tour a->b->c->d->a needs {b,c} as b->c and {d,a} as d->a.
+        vertices(a, b, c, d);
+        arc(a, b); und(b, c); arc(c, d); und(d, a);
+        Walk w = Traversals.eulerTour(vList, eList);
+        assertEulerTrail(w);
+        assertTrue(w.isCircuit());
+    }
+
+    @Test
+    public void parallelUndirectedEdges_tourOfLengthTwo() {
+        vertices(a, b);
+        und(a, b); und(a, b);
+        Walk w = Traversals.eulerTour(vList, eList);
+        assertEulerTrail(w);
+        assertTrue(w.isCircuit());
+    }
+
+    @Test
+    public void parallelArcsSameWay_noTour_trailNeedsBalance() {
+        vertices(a, b);
+        arc(a, b); arc(a, b);
+        assertNull(Traversals.eulerTour(vList, eList));
+        assertNull(Traversals.eulerTrail(vList, eList));
+    }
+
+    @Test
+    public void directedSelfLoop_isEulerTourOfLengthOne() {
+        vertices(a);
+        arc(a, a);
+        Walk w = Traversals.eulerTour(vList, eList);
+        assertEulerTrail(w);
+        assertTrue(w.isCircuit());
+    }
+
+    @Test
+    public void balancedDirectedGraph_eulerTrailIsClosed() {
+        vertices(a, b, c);
+        arc(a, b); arc(b, c); arc(c, a);
+        assertTrue(Traversals.eulerTrail(vList, eList).isCircuit());
+    }
+
+    @Test
+    public void mixedWithSelfLoops_hasEulerTour() {
+        vertices(a, b);
+        arc(a, b); und(b, a); und(a, a); arc(b, b);
+        Walk w = Traversals.eulerTour(vList, eList);
+        assertEulerTrail(w);
+        assertTrue(w.isCircuit());
+    }
+```
+
+**Verification beyond JUnit:** A reviewer left a brute-force fuzz harness at `C:\Users\Jade\AppData\Local\Temp\claude\C--Users-Jade-Documents-Jade-4th-Year--Graph-Theory-v0-5--Graph-Theory-v0-5-GraphTheory\06f6e680-b554-4b2d-9faf-548e1c37e365\scratchpad\graphtheory\Fuzz.java`. It compares `Traversals` against exhaustive search on random small graphs. Adapt it if it references the removed `eulerTooLarge`, run it against the new code (at least 200,000 graphs), and report the mismatch count, which must be 0. Also run `Perf.java` and `Perf2.java` from the same folder; each must finish in well under a second. Don't commit the harness.
+
+**Expected:** `OK (71 tests)`, i.e. 62 − 1 + 10.
+
+**Commit:**
+
+```bash
+git add src/graphtheory/Traversals.java test/graphtheory/TraversalsTest.java
+git commit -m "feat: exact polynomial Euler search for mixed graphs via edge orientation flow
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+---
+
 ## Task 2: Hamiltonian path and Hamiltonian cycle
 
 **Files:**
@@ -689,7 +840,7 @@ In `src/graphtheory/Traversals.java`, insert this block directly above the `/** 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run the build-and-test command.
-Expected: `OK (73 tests)`, i.e. 62 + 11.
+Expected: `OK (82 tests)`, i.e. 71 + 11.
 
 - [ ] **Step 5: Commit**
 
@@ -733,16 +884,52 @@ In `drawGraphSummary`, replace:
 with:
 
 ```java
-    // Same searches as the Find menu items, so the two never disagree (ADR 0003).
-    String eulerCap = "> " + Traversals.EULER_MIXED_EDGE_CAP + " edges";
-    String hamCap   = "> " + Traversals.HAMILTON_VERTEX_CAP + " vertices";
-    boolean eulerCapped = Traversals.eulerTooLarge(eList);
-    boolean hamCapped   = Traversals.hamiltonTooLarge(vList);
-    String eulerTrail = eulerCapped ? eulerCap : yesNo(Traversals.eulerTrail(vList, eList) != null);
-    String eulerTour  = eulerCapped ? eulerCap : yesNo(Traversals.eulerTour(vList, eList) != null);
-    String hamPath    = hamCapped ? hamCap : yesNo(Traversals.hamiltonianPath(vList, eList) != null);
-    String hamCycle   = hamCapped ? hamCap : yesNo(Traversals.hamiltonianCycle(vList, eList) != null);
+    ensureTraversalSummary(vList, eList);
+    String eulerTrail = cachedEulerTrail;
+    String eulerTour  = cachedEulerTour;
+    String hamPath    = cachedHamPath;
+    String hamCycle   = cachedHamCycle;
 ```
+
+Then add the cache directly **above** `drawGraphSummary` (above its javadoc). The Hamiltonian search is exponential, and the Properties window repaints often, so the answers are computed once per graph change. The computation is lazy, so editing in the Graph window never pays for it.
+
+```java
+    // ---- Euler / Hamiltonian answers for the summary, cached per graph change ----
+    // Same searches as the Find menu items, so the two never disagree (ADR 0003).
+
+    private boolean traversalSummaryValid = false;
+    private String cachedEulerTrail, cachedEulerTour, cachedHamPath, cachedHamCycle;
+
+    /** Canvas calls this whenever vertices or edges are added or removed. */
+    public void invalidateTraversalSummary() {
+        traversalSummaryValid = false;
+    }
+
+    private void ensureTraversalSummary(Vector<Vertex> vList, Vector<Edge> eList) {
+        if (traversalSummaryValid) return;
+        cachedEulerTrail = yesNo(Traversals.eulerTrail(vList, eList) != null);
+        cachedEulerTour  = yesNo(Traversals.eulerTour(vList, eList) != null);
+        if (Traversals.hamiltonTooLarge(vList)) {
+            cachedHamPath = cachedHamCycle = "> " + Traversals.HAMILTON_VERTEX_CAP + " vertices";
+        } else {
+            cachedHamPath  = yesNo(Traversals.hamiltonianPath(vList, eList) != null);
+            cachedHamCycle = yesNo(Traversals.hamiltonianCycle(vList, eList) != null);
+        }
+        traversalSummaryValid = true;
+    }
+```
+
+Finally, in `src/graphtheory/Canvas.java`, make `markGraphDirty()` invalidate the cache. Every vertex/edge add or remove, Remove All, and file load already goes through it:
+
+```java
+    private void markGraphDirty() {
+        graphDirty = true;
+        gP.invalidateTraversalSummary();
+        refreshPairPaths();
+    }
+```
+
+(so `git add` in Step 6 must include `src/graphtheory/Canvas.java` too).
 
 - [ ] **Step 3: Rename the summary lines**
 
@@ -780,12 +967,12 @@ Expected: no matches.
 - [ ] **Step 5: Compile and run the tests**
 
 Run the build-and-test command.
-Expected: `OK (73 tests)`.
+Expected: `OK (82 tests)`.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/graphtheory/GraphProperties.java
+git add src/graphtheory/GraphProperties.java src/graphtheory/Canvas.java
 git commit -m "fix: graph summary Euler/Hamiltonian lines respect arc direction; rename to Euler Trail/Tour
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
@@ -850,12 +1037,7 @@ Add this method directly after `handleWalkClick`:
         selectedTool = 7;
         selectedWindow = 0;
         clearWalk();
-        boolean euler = kind.startsWith("Euler");
-        if (euler && Traversals.eulerTooLarge(edgeList)) {
-            walkMessage = "Too large to search (> " + Traversals.EULER_MIXED_EDGE_CAP + " edges)";
-            return;
-        }
-        if (!euler && Traversals.hamiltonTooLarge(vertexList)) {
+        if (kind.startsWith("Hamiltonian") && Traversals.hamiltonTooLarge(vertexList)) {
             walkMessage = "Too large to search (> " + Traversals.HAMILTON_VERTEX_CAP + " vertices)";
             return;
         }
@@ -875,7 +1057,7 @@ Add this method directly after `handleWalkClick`:
 - [ ] **Step 4: Compile and run the tests**
 
 Run the build-and-test command.
-Expected: `OK (73 tests)`.
+Expected: `OK (82 tests)`.
 
 - [ ] **Step 5: Commit**
 
