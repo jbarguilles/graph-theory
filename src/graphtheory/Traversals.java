@@ -297,6 +297,54 @@ public class Traversals {
         return e.vertex1 == e.vertex2;
     }
 
+    // ---------- Hamiltonian ----------
+
+    public static boolean hamiltonTooLarge(Vector<Vertex> vList) {
+        return vList.size() > HAMILTON_VERTEX_CAP;
+    }
+
+    /** A path visiting every vertex, or null. */
+    public static Walk hamiltonianPath(Vector<Vertex> vList, Vector<Edge> eList) {
+        if (vList.isEmpty() || hamiltonTooLarge(vList)) return null;
+        for (Vertex s : vList) {
+            Walk w = new Walk(s);
+            if (extendHamiltonian(w, vList.size(), eList, false)) return w;
+        }
+        return null;
+    }
+
+    /** A cycle visiting every vertex, or null. A cycle passes every vertex, so starting at the first is enough. */
+    public static Walk hamiltonianCycle(Vector<Vertex> vList, Vector<Edge> eList) {
+        if (vList.isEmpty() || hamiltonTooLarge(vList)) return null;
+        Walk w = new Walk(vList.firstElement());
+        return extendHamiltonian(w, vList.size(), eList, true) ? w : null;
+    }
+
+    /**
+     * Backtracking over edges, not neighbour sets: which edge is used matters
+     * for closing a cycle (e.g. {a,b} + (a,b) only closes if (a,b) goes first).
+     */
+    private static boolean extendHamiltonian(Walk w, int n, Vector<Edge> eList, boolean closed) {
+        Vertex at = w.end();
+        if (w.vertices().size() == n) {
+            if (!closed) return true;
+            for (Edge e : eList) {
+                if (Walk.canTraverse(e, at) && Walk.otherEnd(e, at) == w.start() && !w.uses(e)) {
+                    w.extend(e);
+                    return true;
+                }
+            }
+            return false;
+        }
+        for (Edge e : eList) {
+            if (!Walk.canTraverse(e, at) || w.visits(Walk.otherEnd(e, at))) continue;
+            w.extend(e);
+            if (extendHamiltonian(w, n, eList, closed)) return true;
+            w.undo();
+        }
+        return false;
+    }
+
     /** True if every edge lies in one connected piece (direction ignored). */
     private static boolean edgesConnected(Vector<Edge> eList) {
         Map<Vertex, Vertex> parent = new HashMap<Vertex, Vertex>();

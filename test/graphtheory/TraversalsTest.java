@@ -276,4 +276,111 @@ public class TraversalsTest {
         assertEulerTrail(w);
         assertTrue(w.isCircuit());
     }
+
+    // ---------- Hamiltonian ----------
+
+    /** w is a path through every vertex of vList. */
+    private void assertHamiltonianPath(Walk w) {
+        assertNotNull(w);
+        assertTrue(w.isPath());
+        assertEquals(vList.size(), w.vertices().size());
+    }
+
+    /** w is a cycle through every vertex of vList. */
+    private void assertHamiltonianCycle(Walk w) {
+        assertNotNull(w);
+        assertTrue(w.isCycle());
+        assertEquals(vList.size(), w.length());
+        for (Vertex v : vList) assertTrue(w.visits(v));
+    }
+
+    @Test
+    public void noVertices_noHamiltonianPathOrCycle() {
+        assertNull(Traversals.hamiltonianPath(vList, eList));
+        assertNull(Traversals.hamiltonianCycle(vList, eList));
+    }
+
+    @Test
+    public void singleVertex_trivialHamiltonianPath_noCycle() {
+        vertices(a);
+        Walk w = Traversals.hamiltonianPath(vList, eList);
+        assertHamiltonianPath(w);
+        assertEquals(0, w.length());
+        assertNull(Traversals.hamiltonianCycle(vList, eList));
+    }
+
+    @Test
+    public void selfLoop_isHamiltonianCycleOfLengthOne() {
+        vertices(a);
+        und(a, a);
+        assertHamiltonianCycle(Traversals.hamiltonianCycle(vList, eList));
+    }
+
+    @Test
+    public void singleUndirectedEdge_pathButNoCycle() {
+        vertices(a, b);
+        und(a, b);
+        assertHamiltonianPath(Traversals.hamiltonianPath(vList, eList));
+        assertNull(Traversals.hamiltonianCycle(vList, eList));
+    }
+
+    @Test
+    public void undirectedEdgePlusReverseArc_isHamiltonianCycleOfLengthTwo() {
+        vertices(a, b);
+        und(a, b); arc(b, a);
+        assertHamiltonianCycle(Traversals.hamiltonianCycle(vList, eList));
+    }
+
+    @Test
+    public void undirectedEdgePlusSameWayArc_cycleNeedsArcFirst() {
+        // Going out on {a,b} leaves no way back; going out on (a,b) and back on {a,b} works.
+        vertices(a, b);
+        und(a, b); arc(a, b);
+        assertHamiltonianCycle(Traversals.hamiltonianCycle(vList, eList));
+    }
+
+    @Test
+    public void directedPath_hamiltonianPathFromSource_noCycle() {
+        vertices(c, b, a);
+        arc(a, b); arc(b, c);
+        Walk w = Traversals.hamiltonianPath(vList, eList);
+        assertHamiltonianPath(w);
+        assertSame(a, w.start());
+        assertNull(Traversals.hamiltonianCycle(vList, eList));
+    }
+
+    @Test
+    public void arcsOutOfMiddle_noHamiltonianPath() {
+        // Ignoring direction this is the path a-b-c, but from b you can't reach both.
+        vertices(a, b, c);
+        arc(b, a); arc(b, c);
+        assertNull(Traversals.hamiltonianPath(vList, eList));
+    }
+
+    @Test
+    public void undirectedSquare_hasHamiltonianCycle() {
+        vertices(a, b, c, d);
+        und(a, b); und(b, c); und(c, d); und(d, a);
+        assertHamiltonianCycle(Traversals.hamiltonianCycle(vList, eList));
+    }
+
+    @Test
+    public void star_noHamiltonianPath() {
+        vertices(d, a, b, c);
+        und(d, a); und(d, b); und(d, c);
+        assertNull(Traversals.hamiltonianPath(vList, eList));
+    }
+
+    @Test
+    public void overVertexCap_isTooLarge_andReturnsNull() {
+        Vertex prev = null;
+        for (int i = 0; i < 21; i++) {
+            Vertex v = new Vertex("v" + i, 0, 0);
+            vList.add(v);
+            if (prev != null) und(prev, v);
+            prev = v;
+        }
+        assertTrue(Traversals.hamiltonTooLarge(vList));
+        assertNull(Traversals.hamiltonianPath(vList, eList));
+    }
 }
