@@ -18,7 +18,10 @@ import java.util.Vector;
  */
 public class Traversals {
 
-    /** Hamiltonian search is exponential; above this many vertices we don't try. */
+    /**
+     * Hamiltonian search is exponential; above this many vertices we don't try.
+     * The cap bounds memory, not time: the DP needs int[2^n] (4 MB at 20, 4 GB at 30), so don't raise it casually.
+     */
     public static final int HAMILTON_VERTEX_CAP = 20;
 
     // ---------- Euler ----------
@@ -412,15 +415,15 @@ public class Traversals {
         // Walk backwards: the vertex before v is any u that could end the path
         // through mask-without-v and has a step u -> v.
         int[] order = new int[n];
-        int mask = full, v = last;
+        int curMask = full, cur = last;
         for (int k = n - 1; k > 0; k--) {
-            order[k] = v;
-            int rest = mask ^ (1 << v);
-            int prev = Integer.numberOfTrailingZeros(reach[rest] & into[v]);
-            mask = rest;
-            v = prev;
+            order[k] = cur;
+            int rest = curMask ^ (1 << cur);
+            int prev = Integer.numberOfTrailingZeros(reach[rest] & into[cur]);
+            curMask = rest;
+            cur = prev;
         }
-        order[0] = v;
+        order[0] = cur;
 
         Walk w = new Walk(vList.get(order[0]));
         for (int k = 1; k < n; k++) {
