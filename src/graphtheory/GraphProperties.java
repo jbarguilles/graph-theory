@@ -269,6 +269,72 @@ public class GraphProperties {
         return components;
     }
 
+    /**
+     * Returns the weakly connected components as a list of vertex lists.
+     * Each inner Vector<Vertex> is one component, in the order the vertices
+     * appear in vList.
+     */
+    public Vector<Vector<Vertex>> getComponents(Vector<Vertex> vList) {
+        Vector<Vector<Vertex>> components = new Vector<Vector<Vertex>>();
+        if (vList.isEmpty()) return components;
+
+        Set<Vertex> visited = new HashSet<Vertex>();
+
+        for (Vertex start : vList) {
+            if (visited.contains(start)) continue;
+
+            Vector<Vertex> comp = new Vector<Vertex>();
+            ArrayDeque<Vertex> queue = new ArrayDeque<Vertex>();
+            visited.add(start);
+            queue.add(start);
+
+            while (!queue.isEmpty()) {
+                Vertex u = queue.poll();
+                comp.add(u);
+
+                for (Vertex n : u.undirectedNeighbors) {
+                    if (!visited.contains(n) && vList.contains(n)) { visited.add(n); queue.add(n); }
+                }
+                for (Vertex n : u.outNeighbors) {
+                    if (!visited.contains(n) && vList.contains(n)) { visited.add(n); queue.add(n); }
+                }
+                for (Vertex n : u.inNeighbors) {
+                    if (!visited.contains(n) && vList.contains(n)) { visited.add(n); queue.add(n); }
+                }
+            }
+            components.add(comp);
+        }
+        return components;
+    }
+
+    /**
+     * Formats the component list as a single string, e.g.
+     *   "{0, 1, 2}, {3, 4}, {5}"
+     * Truncates with ", ..." if the total character count exceeds maxLen.
+     */
+    public String formatComponents(Vector<Vertex> vList, int maxLen) {
+        Vector<Vector<Vertex>> comps = getComponents(vList);
+        if (comps.isEmpty()) return "\u2014";   // em dash
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < comps.size(); i++) {
+            if (i > 0) sb.append(", ");
+            sb.append("{");
+            Vector<Vertex> comp = comps.get(i);
+            for (int j = 0; j < comp.size(); j++) {
+                if (j > 0) sb.append(", ");
+                sb.append(comp.get(j).name);
+            }
+            sb.append("}");
+        }
+
+        String result = sb.toString();
+        if (result.length() > maxLen) {
+            result = result.substring(0, Math.max(0, maxLen - 3)) + "...";
+        }
+        return result;
+    }
+
     public boolean isStronglyConnected(Vector<Vertex> vList) {
         int n = vList.size();
         if (n <= 1) return false;
@@ -319,13 +385,6 @@ public class GraphProperties {
 
     // ---- Density / Sparse vs Dense ----
 
-    /**
-     * Density of the graph, in [0, 1].
-     *  - Undirected simple graph: |E| / (|V|*(|V|-1)/2)
-     *  - Directed simple graph:   |E| / (|V|*(|V|-1))
-     *  - Mixed graph: uses the directed ceiling.
-     * Returns 0 for |V| <= 1.
-     */
     public double density(Vector<Vertex> vList, Vector<Edge> eList) {
         int n = vList.size();
         if (n <= 1) return 0.0;
@@ -339,13 +398,6 @@ public class GraphProperties {
         return eList.size() / maxEdges;
     }
 
-    /**
-     * Sparse / Dense / In between, using density thresholds:
-     *   density < 0.25  → "Sparse"
-     *   density > 0.75  → "Dense"
-     *   otherwise       → "In between"
-     * Returns "—" for |V| <= 1 (not meaningful).
-     */
     public String sparseDenseLabel(Vector<Vertex> vList, Vector<Edge> eList) {
         int n = vList.size();
         if (n <= 1) return "\u2014";
@@ -428,7 +480,7 @@ public class GraphProperties {
         return false;
     }
 
-    // ---- Graph summary (with κ, λ, connected, strongly connected, density, V/E sets) ----
+    // ---- Graph summary ----
 
     public int drawGraphSummary(Graphics g, Vector<Vertex> vList, Vector<Edge> eList, int x, int y) {
         int bridgeCount = 0;
@@ -472,6 +524,8 @@ public class GraphProperties {
                 ? "Yes"
                 : ("No (" + countComponents(vList) + " components)");
 
+        String componentsStr = formatComponents(vList, 60);
+
         String densityStr = (vList.size() <= 1)
                 ? "\u2014"
                 : (String.format("%.2f", density(vList, eList))
@@ -485,6 +539,7 @@ public class GraphProperties {
             "Connectivity \u03BA(G): " + vertexConnectivityValue,
             "Edge connectivity \u03BB(G): " + edgeConnectivityValue,
             "Connected: " + connectedStr,
+            "Components: " + componentsStr,
             "Strongly connected: " + strongConnectivityLabel(vList, eList),
             "Density |E|/maxE: " + densityStr,
             "Bridges: " + bridgeCount + (bridgeCount > 0 ? " (purple)" : ""),
@@ -497,7 +552,7 @@ public class GraphProperties {
         };
 
         int rowH = 16;
-        int w = 380;
+        int w = 420;
         int h = lines.length * rowH + 6;
 
         g.setColor(new Color(255, 255, 220));
