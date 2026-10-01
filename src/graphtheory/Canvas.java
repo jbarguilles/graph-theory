@@ -1241,7 +1241,7 @@ public class Canvas {
         int rows = Math.min(PATH_ROWS, pathCount);
 
         int x = 210, y = 10, w = 430;
-        int h = 15 * (7 + Math.max(rows, 1)) + 8;
+        int h = 15 * (8 + Math.max(rows, 1)) + 8;
         g.setColor(new Color(240, 248, 255));
         g.fillRect(x, y, w, h);
         g.setColor(Color.BLACK);
@@ -1258,6 +1258,8 @@ public class Canvas {
         } else {
             g.drawString("Geodesic path: N/A",                     lx, ty); ty += 15;
         }
+        int simplePathCount = currentPairVP.pathList != null ? currentPairVP.pathList.size() : 0;
+        g.drawString("Simple paths (Walk\u2229no-repeat): " + simplePathCount, lx, ty); ty += 15;
         g.drawString("Max vertex-disjoint width: " + maxWidth,     lx, ty); ty += 15;
         g.drawString("Paths " + pairLabel + ": " + pathCount
                 + (pathCount > 1 ? "   (\u2191/\u2193 to browse)" : ""),     lx, ty); ty += 15;
