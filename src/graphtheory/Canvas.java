@@ -182,6 +182,7 @@ public class Canvas {
 
     private void markGraphDirty() {
         graphDirty = true;
+        gP.invalidateTraversalSummary();
         refreshPairPaths();
     }
 

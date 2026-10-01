@@ -220,76 +220,28 @@ public class GraphProperties {
         return -1;
     }
 
-    // ---- Connectivity (uses all edge types) ----
+    // ---- Euler / Hamiltonian answers for the summary, cached per graph change ----
+    // Same searches as the Find menu items, so the two never disagree (ADR 0003).
 
-    private boolean isConnected(Vector<Vertex> vList) {
-        if (vList.isEmpty()) return true;
-        Vector<Vertex> nonIsolated = new Vector<Vertex>();
-        for (Vertex v : vList) { if (!v.isIsolated()) nonIsolated.add(v); }
-        if (nonIsolated.isEmpty()) return true;
-        Set<Vertex> visited = new HashSet<Vertex>();
-        dfsConnected(nonIsolated.firstElement(), visited, vList);
-        return visited.size() == nonIsolated.size();
+    private boolean traversalSummaryValid = false;
+    private String cachedEulerTrail, cachedEulerTour, cachedHamPath, cachedHamCycle;
+
+    /** Canvas calls this whenever vertices or edges are added or removed. */
+    public void invalidateTraversalSummary() {
+        traversalSummaryValid = false;
     }
 
-    private void dfsConnected(Vertex v, Set<Vertex> visited, Vector<Vertex> vList) {
-        visited.add(v);
-        for (Vertex n : v.undirectedNeighbors) { if (!visited.contains(n) && vList.contains(n)) dfsConnected(n, visited, vList); }
-        for (Vertex n : v.inNeighbors)         { if (!visited.contains(n) && vList.contains(n)) dfsConnected(n, visited, vList); }
-        for (Vertex n : v.outNeighbors)        { if (!visited.contains(n) && vList.contains(n)) dfsConnected(n, visited, vList); }
-    }
-
-    // ---- Euler conditions ----
-
-    public boolean hasEulerCircuit(Vector<Vertex> vList) {
-        if (!isConnected(vList)) return false;
-        for (Vertex v : vList) { if (!v.isIsolated() && v.getDegree() % 2 != 0) return false; }
-        return true;
-    }
-
-    public boolean hasEulerPath(Vector<Vertex> vList) {
-        if (!isConnected(vList)) return false;
-        int odd = 0;
-        for (Vertex v : vList) { if (!v.isIsolated() && v.getDegree() % 2 != 0) odd++; }
-        return odd == 0 || odd == 2;
-    }
-
-    // ---- Hamiltonian path / cycle (backtracking, capped at 20 vertices) ----
-
-    public boolean hasHamiltonianPath(Vector<Vertex> vList) {
-        if (vList.size() > 20) return false;
-        for (int i = 0; i < vList.size(); i++) {
-            boolean[] vis = new boolean[vList.size()];
-            vis[i] = true;
-            if (hamiltonianPathDFS(i, vList, vis, 1)) return true;
+    private void ensureTraversalSummary(Vector<Vertex> vList, Vector<Edge> eList) {
+        if (traversalSummaryValid) return;
+        cachedEulerTrail = yesNo(Traversals.eulerTrail(vList, eList) != null);
+        cachedEulerTour  = yesNo(Traversals.eulerTour(vList, eList) != null);
+        if (Traversals.hamiltonTooLarge(vList)) {
+            cachedHamPath = cachedHamCycle = "> " + Traversals.HAMILTON_VERTEX_CAP + " vertices";
+        } else {
+            cachedHamPath  = yesNo(Traversals.hamiltonianPath(vList, eList) != null);
+            cachedHamCycle = yesNo(Traversals.hamiltonianCycle(vList, eList) != null);
         }
-        return false;
-    }
-
-    private boolean hamiltonianPathDFS(int u, Vector<Vertex> vList, boolean[] vis, int count) {
-        if (count == vList.size()) return true;
-        for (int v : getAllNeighborIndices(u, vList)) {
-            if (!vis[v]) { vis[v] = true; if (hamiltonianPathDFS(v, vList, vis, count + 1)) return true; vis[v] = false; }
-        }
-        return false;
-    }
-
-    public boolean hasHamiltonianCycle(Vector<Vertex> vList) {
-        if (vList.size() > 20 || vList.size() < 3) return false;
-        for (int i = 0; i < vList.size(); i++) {
-            boolean[] vis = new boolean[vList.size()];
-            vis[i] = true;
-            if (hamiltonianCycleDFS(i, i, vList, vis, 1)) return true;
-        }
-        return false;
-    }
-
-    private boolean hamiltonianCycleDFS(int start, int u, Vector<Vertex> vList, boolean[] vis, int count) {
-        if (count == vList.size()) return getAllNeighborIndices(u, vList).contains(start);
-        for (int v : getAllNeighborIndices(u, vList)) {
-            if (!vis[v]) { vis[v] = true; if (hamiltonianCycleDFS(start, v, vList, vis, count + 1)) return true; vis[v] = false; }
-        }
-        return false;
+        traversalSummaryValid = true;
     }
 
     // ---- Graph summary (with Order / Size / Magnitude, and V/E sets) ----
@@ -302,11 +254,11 @@ public int drawGraphSummary(Graphics g, Vector<Vertex> vList, Vector<Edge> eList
     int bridgeCount = 0;
     for (Edge e : eList) { if (e.isBridge) bridgeCount++; }
 
-    boolean eulerCircuit = hasEulerCircuit(vList);
-    boolean eulerPath    = hasEulerPath(vList);
-    boolean hamPath      = vList.size() <= 20 && hasHamiltonianPath(vList);
-    boolean hamCycle     = vList.size() <= 20 && hasHamiltonianCycle(vList);
-    boolean tooLarge     = vList.size() > 20;
+    ensureTraversalSummary(vList, eList);
+    String eulerTrail = cachedEulerTrail;
+    String eulerTour  = cachedEulerTour;
+    String hamPath    = cachedHamPath;
+    String hamCycle   = cachedHamCycle;
 
     int order     = vList.size();
     int size      = eList.size();
@@ -344,10 +296,10 @@ public int drawGraphSummary(Graphics g, Vector<Vertex> vList, Vector<Edge> eList
         "Size |E|: " + size,
         "Magnitude |V|+|E|: " + magnitude,
         "Bridges: " + bridgeCount + (bridgeCount > 0 ? " (purple)" : ""),
-        "Euler Circuit: " + (eulerCircuit ? "Yes" : "No"),
-        "Euler Path (Trail): " + (eulerPath ? "Yes" : "No"),
-        "Hamiltonian Path: " + (tooLarge ? ">20 vertices" : (hamPath ? "Yes" : "No")),
-        "Hamiltonian Cycle: " + (tooLarge ? ">20 vertices" : (hamCycle ? "Yes" : "No")),
+        "Euler Trail: " + eulerTrail,
+        "Euler Tour: " + eulerTour,
+        "Hamiltonian Path: " + hamPath,
+        "Hamiltonian Cycle: " + hamCycle,
         vLine,
         eLine,
     };
@@ -368,6 +320,10 @@ public int drawGraphSummary(Graphics g, Vector<Vertex> vList, Vector<Edge> eList
     }
     return h;
 }
+
+    private static String yesNo(boolean b) {
+        return b ? "Yes" : "No";
+    }
 
     // ---- Cutpoints ----
 
