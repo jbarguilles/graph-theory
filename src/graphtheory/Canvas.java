@@ -122,6 +122,13 @@ public class Canvas {
         item = new JMenuItem("Mark as Root");
         item.addActionListener(new MenuListener());
         menuOptions2.add(item);
+        menuOptions2.addSeparator();
+        for (String find : new String[] {"Find Euler Trail", "Find Euler Tour",
+                                         "Find Hamiltonian Path", "Find Hamiltonian Cycle"}) {
+            item = new JMenuItem(find);
+            item.addActionListener(new MenuListener());
+            menuOptions2.add(item);
+        }
 
         item = new JMenuItem("Graph");
         item.addActionListener(new MenuListener());
@@ -306,6 +313,30 @@ public class Canvas {
             currentWalk.extend(options.get(0));
             walkMessage = null;
         }
+    }
+
+    /**
+     * Extras > Find …: switches to the Build Walk tool on the Graph window and
+     * loads the walk found, or says none exists. kind is e.g. "Euler Tour".
+     */
+    private void findTraversal(String kind) {
+        selectedTool = 7;
+        selectedWindow = 0;
+        clearWalk();
+        if (kind.startsWith("Hamiltonian") && Traversals.hamiltonTooLarge(vertexList)) {
+            walkMessage = "Too large to search (> " + Traversals.HAMILTON_VERTEX_CAP + " vertices)";
+            return;
+        }
+        if (kind.equals("Euler Trail")) {
+            currentWalk = Traversals.eulerTrail(vertexList, edgeList);
+        } else if (kind.equals("Euler Tour")) {
+            currentWalk = Traversals.eulerTour(vertexList, edgeList);
+        } else if (kind.equals("Hamiltonian Path")) {
+            currentWalk = Traversals.hamiltonianPath(vertexList, edgeList);
+        } else {
+            currentWalk = Traversals.hamiltonianCycle(vertexList, edgeList);
+        }
+        if (currentWalk == null) walkMessage = "No " + kind + " exists";
     }
 
     private static String truncate(String s, int max) {
@@ -619,6 +650,8 @@ public class Canvas {
             } else if (command.equals("Build Walk")) {
                 selectedTool = 7;
                 clearWalk();
+            } else if (command.startsWith("Find ")) {
+                findTraversal(command.substring("Find ".length()));
             } else if (command.equals("Mark as Root")) {
                 for (Vertex v : vertexList) {
                     if (v.wasClicked) {
