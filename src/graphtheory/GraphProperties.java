@@ -29,16 +29,10 @@ public class GraphProperties {
     public int[][] distanceMatrix;
     public Vector<VertexPair> vpList;
 
-    /** Witness set of size κ(G) whose removal disconnects (or reduces) the graph. */
     public Vector<Vertex> witnessVertices = new Vector<Vertex>();
-
-    /** κ(G): minimum number of vertices whose removal disconnects the graph. */
     public int vertexConnectivityValue = 0;
 
-    /** Witness set of size λ(G) whose removal disconnects (or reduces) the graph. */
     public Vector<Edge> witnessEdges = new Vector<Edge>();
-
-    /** λ(G): minimum number of edges whose removal disconnects the graph. */
     public int edgeConnectivityValue = 0;
 
     public int[][] generateAdjacencyMatrix(Vector<Vertex> vList, Vector<Edge> eList) {
@@ -374,9 +368,6 @@ public class GraphProperties {
 
     // ---- Bipartite ----
 
-    /**
-     * True if the graph is bipartite.
-     */
     public boolean isBipartite(Vector<Vertex> vList) {
         if (vList.isEmpty()) return true;
 
@@ -407,15 +398,6 @@ public class GraphProperties {
         return true;
     }
 
-    /**
-     * Returns the two color classes of a bipartite graph as a 2-element array:
-     *   result[0] = side A (vertices colored 0)
-     *   result[1] = side B (vertices colored 1)
-     * Returns null if the graph is not bipartite.
-     *
-     * Uses the same BFS 2-coloring as isBipartite(), so the two methods are
-     * always consistent. Isolated vertices are assigned to side A (arbitrary).
-     */
     @SuppressWarnings("unchecked")
     public Vector<Vertex>[] bipartiteSides(Vector<Vertex> vList) {
         if (vList.isEmpty()) return null;
@@ -439,13 +421,12 @@ public class GraphProperties {
                         color.put(w, next);
                         queue.add(w);
                     } else if (color.get(w) == cu) {
-                        return null;   // not bipartite
+                        return null;
                     }
                 }
             }
         }
 
-        // Safety: assign any vertex the BFS never touched.
         for (Vertex v : vList) if (!color.containsKey(v)) color.put(v, 0);
 
         Vector<Vertex>[] sides = new Vector[2];
@@ -458,12 +439,6 @@ public class GraphProperties {
         return sides;
     }
 
-    /**
-     * Human-readable string of the bipartition, e.g.
-     *   "Yes — A = {0, 2, 4}, B = {1, 3, 5}"
-     * or "No" if not bipartite, or "—" for trivial graphs.
-     * Truncates gracefully if the result is too long.
-     */
     public String bipartiteLabel(Vector<Vertex> vList) {
         int n = vList.size();
         if (n <= 1) return "\u2014";
@@ -499,7 +474,7 @@ public class GraphProperties {
         return result;
     }
 
-    // ---- Density / Sparse vs Dense ----
+    // ---- Density ----
 
     public double density(Vector<Vertex> vList, Vector<Edge> eList) {
         int n = vList.size();
@@ -523,6 +498,155 @@ public class GraphProperties {
         if (d > 0.75) return "Dense";
         return "In between";
     }
+
+    // ---- Acyclic / Forest / Tree / Star / Rooted tree ----
+
+    /**
+     * True if the graph has no cycles, treating all edges as undirected.
+     * A self-loop counts as a cycle.
+     * Isolated vertices don't create cycles.
+     */
+    public boolean isAcyclic(Vector<Vertex> vList) {
+        Set<Vertex> visited = new HashSet<Vertex>();
+
+        for (Vertex start : vList) {
+            if (visited.contains(start)) continue;
+            if (hasCycleDFS(start, null, visited)) return false;
+        }
+        return true;
+    }
+
+    /**
+     * DFS helper: returns true iff a cycle is reachable from `u` in the
+     * subgraph induced by unvisited vertices plus the edge back to `parent`.
+     */
+    private boolean hasCycleDFS(Vertex u, Vertex parent, Set<Vertex> visited) {
+        visited.add(u);
+
+        for (Vertex w : allNeighborsUndirected(u)) {
+            if (w == u) return true;                 // self-loop
+            if (!visited.contains(w)) {
+                if (hasCycleDFS(w, u, visited)) return true;
+            } else if (w != parent) {
+                return true;                         // back edge → cycle
+            }
+        }
+        return false;
+    }
+
+    /** All neighbors of u, treating directed edges as undirected, deduplicated. */
+    private List<Vertex> allNeighborsUndirected(Vertex u) {
+        List<Vertex> result = new ArrayList<Vertex>();
+        for (Vertex v : u.undirectedNeighbors) if (!result.contains(v)) result.add(v);
+        for (Vertex v : u.outNeighbors)        if (!result.contains(v)) result.add(v);
+        for (Vertex v : u.inNeighbors)         if (!result.contains(v)) result.add(v);
+        return result;
+    }
+
+    /**
+     * A forest is an acyclic graph — each component is a tree.
+     * Equivalent to isAcyclic.
+     */
+    public boolean isForest(Vector<Vertex> vList) {
+        return isAcyclic(vList);
+    }
+
+    /**
+     * A free tree is a connected forest.
+     * A single vertex counts as a tree; the empty graph does not.
+     */
+    public boolean isFreeTree(Vector<Vertex> vList) {
+        if (vList.isEmpty()) return false;
+        return isConnected(vList) && isAcyclic(vList);
+    }
+
+    /**
+     * True if the graph is a star K_{1,n} for some n ≥ 2.
+     * A star is a tree with one center vertex adjacent to every other.
+     * - |V| < 3 → not a star by the strict convention (K_{1,1} is excluded).
+     * - Star iff it's a tree and exactly one vertex has degree |V|-1.
+     */
+    public boolean isStar(Vector<Vertex> vList) {
+        int n = vList.size();
+        if (n < 3) return false;
+        if (!isFreeTree(vList)) return false;
+
+        int centerCount = 0;
+        for (Vertex v : vList) {
+            if (v.getDegree() == n - 1) centerCount++;
+        }
+        return centerCount == 1;
+    }
+
+    /**
+     * True if the graph is a free tree AND exactly one vertex is marked as root.
+     */
+    public boolean isRootedTree(Vector<Vertex> vList) {
+        if (!isFreeTree(vList)) return false;
+
+        int rootCount = 0;
+        for (Vertex v : vList) if (v.isRoot) rootCount++;
+        return rootCount == 1;
+    }
+
+    /** Returns the unique root vertex if exactly one is marked, else null. */
+    public Vertex getRoot(Vector<Vertex> vList) {
+        Vertex root = null;
+        for (Vertex v : vList) {
+            if (v.isRoot) {
+                if (root != null) return null;
+                root = v;
+            }
+        }
+        return root;
+    }
+
+    /**
+ * Composite label for the Tree row.
+ *  - "" (empty graph):               "—"
+ *  - single free tree with 1 root:   "Rooted tree (root = X)"
+ *  - single free tree:               "Free tree"
+ *  - acyclic, disconnected:          "Forest (k trees; roots = a, b, ...)"
+ *  - otherwise:                      "No"
+ */
+public String treeLabel(Vector<Vertex> vList) {
+    if (vList.isEmpty()) return "\u2014";
+
+    // Single connected free tree
+    if (isFreeTree(vList)) {
+        if (isRootedTree(vList)) {
+            Vertex r = getRoot(vList);
+            return "Rooted tree (root = " + r.name + ")";
+        }
+        return "Free tree";
+    }
+
+    // Disconnected acyclic → forest, list per-component roots if any
+    if (isForest(vList)) {
+        Vector<Vector<Vertex>> comps = getComponents(vList);
+        StringBuilder sb = new StringBuilder();
+        sb.append("Forest (").append(comps.size()).append(" trees");
+        StringBuilder roots = new StringBuilder();
+        for (Vector<Vertex> comp : comps) {
+            Vertex compRoot = null;
+            for (Vertex v : comp) {
+                if (v.isRoot) {
+                    if (compRoot != null) { compRoot = null; break; }
+                    compRoot = v;
+                }
+            }
+            if (compRoot != null) {
+                if (roots.length() > 0) roots.append(", ");
+                roots.append(compRoot.name);
+            }
+        }
+        if (roots.length() > 0) sb.append("; roots = ").append(roots);
+        sb.append(")");
+        return sb.toString();
+    }
+
+    return "No";
+}
 
     // ---- Connectivity for Euler checks (isolated vertices ignored) ----
 
@@ -649,6 +773,16 @@ public class GraphProperties {
 
         String bipartiteStr = bipartiteLabel(vList);
 
+        String treeStr = treeLabel(vList);
+
+        String starStr = (vList.size() <= 1)
+                ? "\u2014"
+                : (isStar(vList) ? "Yes" : "No");
+
+        String cyclicStr = vList.isEmpty()
+                ? "\u2014"
+                : (isAcyclic(vList) ? "Acyclic" : "Cyclic");
+
         String[] lines = {
             "Graph Summary",
             "Order |V|: " + order,
@@ -661,6 +795,9 @@ public class GraphProperties {
             "Strongly connected: " + strongConnectivityLabel(vList, eList),
             "Bipartite: " + bipartiteStr,
             "Density |E|/maxE: " + densityStr,
+            "Tree: " + treeStr,
+            "Star: " + starStr,
+            "Cyclic/Acyclic: " + cyclicStr,
             "Bridges: " + bridgeCount + (bridgeCount > 0 ? " (purple)" : ""),
             "Euler Circuit: " + (eulerCircuit ? "Yes" : "No"),
             "Euler Path (Trail): " + (eulerPath ? "Yes" : "No"),
