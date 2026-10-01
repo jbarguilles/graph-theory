@@ -109,6 +109,10 @@ public class Canvas {
         item.addActionListener(new MenuListener());
         menuOptions2.add(item);
 
+        item = new JMenuItem("Show Induced Subgraph");
+        item.addActionListener(new MenuListener());
+        menuOptions2.add(item);
+
         item = new JMenuItem("Remove All");
         item.addActionListener(new MenuListener());
         menuOptions2.add(item);
@@ -266,10 +270,6 @@ public class Canvas {
         graphDirty = false;
     }
 
-    /**
-     * All vertices in the same weakly connected component as `start`.
-     * Treats directed edges as undirected.
-     */
     private Set<Vertex> connectedComponentOf(Vertex start) {
         Set<Vertex> visited = new HashSet<Vertex>();
         ArrayDeque<Vertex> queue = new ArrayDeque<Vertex>();
@@ -284,16 +284,6 @@ public class Canvas {
         return visited;
     }
 
-    /**
-     * Returns the smallest non-negative integer (as a string) that is not
-     * already used as the name of a vertex in vertexList.
-     *
-     * Examples:
-     *  - Empty graph:           "0"
-     *  - {0, 1, 2}:             "3"
-     *  - {0, 2} (1 was removed):"1"
-     *  - {1, 2} (0 was removed):"0"
-     */
     private String nextAvailableVertexName() {
         Set<String> used = new HashSet<String>();
         for (Vertex v : vertexList) {
@@ -302,6 +292,114 @@ public class Canvas {
         int i = 0;
         while (used.contains("" + i)) i++;
         return "" + i;
+    }
+
+    /**
+     * Build the induced subgraph of the currently selected (wasClicked) vertices:
+     *   - keep only those vertices,
+     *   - keep only edges whose BOTH endpoints are in the set.
+     *
+     * Returns a 2-element Vector: [0] = Vector&lt;Vertex&gt;, [1] = Vector&lt;Edge&gt;.
+     * Returns null if fewer than 1 vertex is selected.
+     */
+    private Vector<Vector> buildInducedSubgraph() {
+        Vector<Vertex> selV = new Vector<Vertex>();
+        for (Vertex v : vertexList) {
+            if (v.wasClicked) selV.add(v);
+        }
+        if (selV.isEmpty()) return null;
+
+        Vector<Edge> selE = new Vector<Edge>();
+        for (Edge e : edgeList) {
+            if (selV.contains(e.vertex1) && selV.contains(e.vertex2)) {
+                selE.add(e);
+            }
+        }
+
+        Vector<Vector> result = new Vector<Vector>();
+        result.add(selV);
+        result.add(selE);
+        return result;
+    }
+
+    /**
+     * Opens a read-only window showing the induced subgraph.
+     * Coordinates are scaled so the subgraph fills the window nicely.
+     */
+    private void showSubgraphWindow(Vector<Vector> sub) {
+        Vector<Vertex> sV = sub.firstElement();
+        Vector<Edge> sE = sub.lastElement();
+
+        JFrame w = new JFrame("Induced Subgraph (" + sV.size() + " vertices, "
+                              + sE.size() + " edges)");
+        w.setSize(500, 500);
+
+        JPanel p = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                Graphics2D g2 = (Graphics2D) g;
+
+                g2.setColor(Color.WHITE);
+                g2.fillRect(0, 0, getWidth(), getHeight());
+
+                if (sV.isEmpty()) return;
+
+                // Bounding box of selected vertices
+                int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE;
+                int maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE;
+                for (Vertex v : sV) {
+                    minX = Math.min(minX, v.location.x);
+                    minY = Math.min(minY, v.location.y);
+                    maxX = Math.max(maxX, v.location.x);
+                    maxY = Math.max(maxY, v.location.y);
+                }
+                int margin = 50;
+                int srcW = Math.max(1, maxX - minX);
+                int srcH = Math.max(1, maxY - minY);
+                double scale = Math.min(
+                        (getWidth()  - 2 * margin) / (double) srcW,
+                        (getHeight() - 2 * margin) / (double) srcH);
+                if (scale > 1.0) scale = 1.0;   // don't zoom in beyond 1x
+
+                // Draw edges first
+                g2.setColor(Color.BLACK);
+                for (Edge e : sE) {
+                    int x1 = (int) ((e.vertex1.location.x - minX) * scale) + margin;
+                    int y1 = (int) ((e.vertex1.location.y - minY) * scale) + margin;
+                    int x2 = (int) ((e.vertex2.location.x - minX) * scale) + margin;
+                    int y2 = (int) ((e.vertex2.location.y - minY) * scale) + margin;
+                    g2.drawLine(x1, y1, x2, y2);
+
+                    // weight label at midpoint
+                    int mx = (x1 + x2) / 2;
+                    int my = (y1 + y2) / 2;
+                    g2.setColor(new Color(80, 80, 80));
+                    g2.drawString("" + e.weight, mx + 4, my - 4);
+                    g2.setColor(Color.BLACK);
+                }
+
+                // Draw vertices on top
+                int r = 30;
+                for (Vertex v : sV) {
+                    int cx = (int) ((v.location.x - minX) * scale) + margin;
+                    int cy = (int) ((v.location.y - minY) * scale) + margin;
+
+                    g2.setColor(Color.BLACK);
+                    g2.fillOval(cx - r / 2, cy - r / 2, r, r);
+                    g2.setColor(Color.WHITE);
+                    g2.fillOval(cx - r / 2 + 5, cy - r / 2 + 5, r - 10, r - 10);
+
+                    g2.setColor(Color.BLACK);
+                    FontMetrics fm = g2.getFontMetrics();
+                    int tw = fm.stringWidth(v.name);
+                    g2.drawString(v.name, cx - tw / 2, cy + 5);
+                }
+            }
+        };
+
+        w.setContentPane(p);
+        w.setVisible(true);
     }
 
     class InputListener implements MouseListener, MouseMotionListener {
@@ -515,23 +613,19 @@ public class Canvas {
                         break;
                     }
                     case 3: {
-                        for (Vertex v : vertexList) {
-                            v.wasClicked = false;
-                        }
-
-                        for (Edge d : edgeList) {
-                            if (d.hasIntersection(e.getX(), e.getY())) {
-                                d.wasClicked = true;
-                                clickedEdgeIndex = edgeList.indexOf(d);
-                            } else {
-                                d.wasClicked = false;
-                            }
-                        }
+                        // Grab Tool now supports multi-select for subgraph:
+                        //   - click a vertex to toggle its selection
+                        //   - click empty space to clear all selections
+                        boolean hitAny = false;
                         for (Vertex v : vertexList) {
                             if (v.hasIntersection(e.getX(), e.getY())) {
-                                v.wasClicked = true;
+                                v.wasClicked = !v.wasClicked;
                                 clickedVertexIndex = vertexList.indexOf(v);
+                                hitAny = true;
                             }
+                        }
+                        if (!hitAny) {
+                            for (Vertex v : vertexList) v.wasClicked = false;
                         }
 
                         updateHover(e.getX(), e.getY());
@@ -557,8 +651,6 @@ public class Canvas {
 
                             boolean sameVertex = (v == parentV);
 
-                            // For a self-loop, allow only one. For a normal edge,
-                            // block if already connected in any direction.
                             boolean alreadyThere = sameVertex
                                     ? parentV.undirectedNeighbors.contains(parentV)
                                     : v.connectedToVertex(parentV);
@@ -681,6 +773,16 @@ public class Canvas {
                 selectedTool = 8;
             } else if (command.equals("Auto Arrange Vertices")) {
                 arrangeVertices();
+            } else if (command.equals("Show Induced Subgraph")) {
+                Vector<Vector> sub = buildInducedSubgraph();
+                if (sub == null) {
+                    JOptionPane.showMessageDialog(frame,
+                            "Select at least one vertex (Grab Tool) before showing the subgraph.",
+                            "No selection",
+                            JOptionPane.INFORMATION_MESSAGE);
+                } else {
+                    showSubgraphWindow(sub);
+                }
             } else if (command.equals("Remove All")) {
                 edgeList.removeAllElements();
                 vertexList.removeAllElements();
@@ -835,20 +937,28 @@ public class Canvas {
     }
 
     private void drawInfoBox(Graphics g) {
+        // Show the info box for the *first* selected vertex. If more than one
+        // is selected, also show the total count.
         Vertex clicked = null;
+        int selCount = 0;
         for (Vertex v : vertexList) {
-            if (v.wasClicked) { clicked = v; break; }
+            if (v.wasClicked) {
+                selCount++;
+                if (clicked == null) clicked = v;
+            }
         }
         if (clicked == null) return;
 
-        int x = 10, y = 10, w = 170, h = 142;
+        int x = 10, y = 10, w = 190, h = 158;
         g.setColor(new Color(245, 245, 245));
         g.fillRect(x, y, w, h);
         g.setColor(Color.BLACK);
         g.drawRect(x, y, w, h);
 
         int ty = y + 16;
-        g.drawString("Vertex: " + clicked.name,             x + 6, ty); ty += 16;
+        g.drawString("Selected: " + selCount + " vertex" + (selCount == 1 ? "" : "es"),
+                     x + 6, ty); ty += 16;
+        g.drawString("First: " + clicked.name,              x + 6, ty); ty += 16;
         g.drawString("Degree: " + clicked.degree(),         x + 6, ty); ty += 16;
         g.drawString("In-Degree: " + clicked.inDegree(),    x + 6, ty); ty += 16;
         g.drawString("Out-Degree: " + clicked.outDegree(),  x + 6, ty); ty += 16;
@@ -897,7 +1007,7 @@ public class Canvas {
 
         String pairLabel = v1.name + " \u2192 " + v2.name;
 
-        int x = 190, y = 10, w = 280, h = 178;
+        int x = 210, y = 10, w = 280, h = 178;
         g.setColor(new Color(240, 248, 255));
         g.fillRect(x, y, w, h);
         g.setColor(Color.BLACK);
