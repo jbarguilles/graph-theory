@@ -222,11 +222,10 @@ public class Canvas {
         int matrixHeight = matrixRows * 20 + 30;    // each matrix
 
         // Right column total height: adj + gap + dist + gap + summary
-        int rightHeight = 50
+      int rightHeight = 50
                 + matrixHeight + 20
                 + matrixHeight + 20
-                + 16 * 16 + 20;   // was 15 * 16 + 20
-        // Left column total height: preview + gap + node table + captions
+                + 18 * 16 + 20;   // was 17 * 16 + 20
         int leftHeight = 10
                        + height / 2 + 20
                        + (vertexList.size() + 2) * 18 + 30

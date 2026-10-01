@@ -7,10 +7,14 @@ package graphtheory;
 import java.awt.Color;
 import java.awt.Graphics;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.Vector;
 
@@ -57,11 +61,6 @@ public class GraphProperties {
         return adjacencyMatrix;
     }
 
-    /**
-     * Weighted shortest paths between all pairs via Dijkstra per source.
-     * Uses EdgeRegistry, which Canvas.refresh() keeps in sync.
-     * Unreachable pairs get -1 (rendered as ∞ in the matrix display).
-     */
     public int[][] generateDistanceMatrix(Vector<Vertex> vList) {
         distanceMatrix = new int[vList.size()][vList.size()];
 
@@ -235,7 +234,7 @@ public class GraphProperties {
         return -1;
     }
 
-    // ---- Connectivity: strict version (isolated vertices count) ----
+    // ---- Connectivity ----
 
     public boolean isConnected(Vector<Vertex> vList) {
         return countComponents(vList) == 1;
@@ -269,11 +268,6 @@ public class GraphProperties {
         return components;
     }
 
-    /**
-     * Returns the weakly connected components as a list of vertex lists.
-     * Each inner Vector<Vertex> is one component, in the order the vertices
-     * appear in vList.
-     */
     public Vector<Vector<Vertex>> getComponents(Vector<Vertex> vList) {
         Vector<Vector<Vertex>> components = new Vector<Vector<Vertex>>();
         if (vList.isEmpty()) return components;
@@ -307,14 +301,9 @@ public class GraphProperties {
         return components;
     }
 
-    /**
-     * Formats the component list as a single string, e.g.
-     *   "{0, 1, 2}, {3, 4}, {5}"
-     * Truncates with ", ..." if the total character count exceeds maxLen.
-     */
     public String formatComponents(Vector<Vertex> vList, int maxLen) {
         Vector<Vector<Vertex>> comps = getComponents(vList);
-        if (comps.isEmpty()) return "\u2014";   // em dash
+        if (comps.isEmpty()) return "\u2014";
 
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < comps.size(); i++) {
@@ -381,6 +370,133 @@ public class GraphProperties {
     private String strongConnectivityLabel(Vector<Vertex> vList, Vector<Edge> eList) {
         if (!hasDirectedEdges(eList)) return "\u2014";
         return isStronglyConnected(vList) ? "Yes" : "No";
+    }
+
+    // ---- Bipartite ----
+
+    /**
+     * True if the graph is bipartite.
+     */
+    public boolean isBipartite(Vector<Vertex> vList) {
+        if (vList.isEmpty()) return true;
+
+        Map<Vertex, Integer> color = new HashMap<Vertex, Integer>();
+
+        for (Vertex start : vList) {
+            if (color.containsKey(start)) continue;
+
+            ArrayDeque<Vertex> queue = new ArrayDeque<Vertex>();
+            color.put(start, 0);
+            queue.add(start);
+
+            while (!queue.isEmpty()) {
+                Vertex u = queue.poll();
+                int cu = color.get(u);
+                int next = 1 - cu;
+
+                for (Vertex w : bipartiteNeighbors(u)) {
+                    if (!color.containsKey(w)) {
+                        color.put(w, next);
+                        queue.add(w);
+                    } else if (color.get(w) == cu) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Returns the two color classes of a bipartite graph as a 2-element array:
+     *   result[0] = side A (vertices colored 0)
+     *   result[1] = side B (vertices colored 1)
+     * Returns null if the graph is not bipartite.
+     *
+     * Uses the same BFS 2-coloring as isBipartite(), so the two methods are
+     * always consistent. Isolated vertices are assigned to side A (arbitrary).
+     */
+    @SuppressWarnings("unchecked")
+    public Vector<Vertex>[] bipartiteSides(Vector<Vertex> vList) {
+        if (vList.isEmpty()) return null;
+
+        Map<Vertex, Integer> color = new HashMap<Vertex, Integer>();
+
+        for (Vertex start : vList) {
+            if (color.containsKey(start)) continue;
+
+            ArrayDeque<Vertex> queue = new ArrayDeque<Vertex>();
+            color.put(start, 0);
+            queue.add(start);
+
+            while (!queue.isEmpty()) {
+                Vertex u = queue.poll();
+                int cu = color.get(u);
+                int next = 1 - cu;
+
+                for (Vertex w : bipartiteNeighbors(u)) {
+                    if (!color.containsKey(w)) {
+                        color.put(w, next);
+                        queue.add(w);
+                    } else if (color.get(w) == cu) {
+                        return null;   // not bipartite
+                    }
+                }
+            }
+        }
+
+        // Safety: assign any vertex the BFS never touched.
+        for (Vertex v : vList) if (!color.containsKey(v)) color.put(v, 0);
+
+        Vector<Vertex>[] sides = new Vector[2];
+        sides[0] = new Vector<Vertex>();
+        sides[1] = new Vector<Vertex>();
+        for (Vertex v : vList) {
+            int c = color.get(v);
+            sides[c].add(v);
+        }
+        return sides;
+    }
+
+    /**
+     * Human-readable string of the bipartition, e.g.
+     *   "Yes — A = {0, 2, 4}, B = {1, 3, 5}"
+     * or "No" if not bipartite, or "—" for trivial graphs.
+     * Truncates gracefully if the result is too long.
+     */
+    public String bipartiteLabel(Vector<Vertex> vList) {
+        int n = vList.size();
+        if (n <= 1) return "\u2014";
+
+        Vector<Vertex>[] sides = bipartiteSides(vList);
+        if (sides == null) return "No";
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("Yes \u2014 A = {");
+        for (int i = 0; i < sides[0].size(); i++) {
+            if (i > 0) sb.append(", ");
+            sb.append(sides[0].get(i).name);
+        }
+        sb.append("}, B = {");
+        for (int i = 0; i < sides[1].size(); i++) {
+            if (i > 0) sb.append(", ");
+            sb.append(sides[1].get(i).name);
+        }
+        sb.append("}");
+
+        String result = sb.toString();
+        if (result.length() > 80) {
+            result = result.substring(0, 77) + "...";
+        }
+        return result;
+    }
+
+    private List<Vertex> bipartiteNeighbors(Vertex u) {
+        List<Vertex> result = new ArrayList<Vertex>();
+        for (Vertex v : u.undirectedNeighbors) if (!result.contains(v)) result.add(v);
+        for (Vertex v : u.outNeighbors)        if (!result.contains(v)) result.add(v);
+        for (Vertex v : u.inNeighbors)         if (!result.contains(v)) result.add(v);
+        return result;
     }
 
     // ---- Density / Sparse vs Dense ----
@@ -531,6 +647,8 @@ public class GraphProperties {
                 : (String.format("%.2f", density(vList, eList))
                    + " (" + sparseDenseLabel(vList, eList) + ")");
 
+        String bipartiteStr = bipartiteLabel(vList);
+
         String[] lines = {
             "Graph Summary",
             "Order |V|: " + order,
@@ -541,6 +659,7 @@ public class GraphProperties {
             "Connected: " + connectedStr,
             "Components: " + componentsStr,
             "Strongly connected: " + strongConnectivityLabel(vList, eList),
+            "Bipartite: " + bipartiteStr,
             "Density |E|/maxE: " + densityStr,
             "Bridges: " + bridgeCount + (bridgeCount > 0 ? " (purple)" : ""),
             "Euler Circuit: " + (eulerCircuit ? "Yes" : "No"),
