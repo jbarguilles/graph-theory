@@ -308,7 +308,7 @@ public class Canvas {
 
                         String input = JOptionPane.showInputDialog(
                                 frame,
-                                "Edge " + target.vertex1.name + " → " + target.vertex2.name
+                                "Edge " + target.vertex1.name + " \u2192 " + target.vertex2.name
                                      + (target.directed ? " (directed)" : " (undirected)")
                                      + "\nEnter new weight (non-negative integer):",
                                 "" + target.weight);
@@ -547,10 +547,15 @@ public class Canvas {
                 if (vertexList.size() > 0) {
                     int[][] matrix = gP.generateAdjacencyMatrix(vertexList, edgeList);
 
-                    Vector<Vertex> tempList = gP.vertexConnectivity(vertexList);
-                    for (Vertex v : tempList) {
-                        vertexList.get(vertexList.indexOf(v)).wasClicked = true;
+                    // Compute κ(G) and highlight the witness set (red).
+                    gP.vertexConnectivity(vertexList);
+
+                    // Clear previous red marks, then mark only the witness vertices.
+                    for (Vertex v : vertexList) v.wasClicked = false;
+                    for (Vertex v : gP.witnessVertices) {
+                        v.wasClicked = true;
                     }
+
                     reloadVertexConnections(matrix, vertexList);
 
                     gP.generateDistanceMatrix(vertexList);
@@ -604,7 +609,7 @@ public class Canvas {
 
     public void refresh() {
         recomputeGraphProperties();
-        EdgeRegistry.rebuild(edgeList);     // <-- weights available to Dijkstra
+        EdgeRegistry.rebuild(edgeList);
         erase();
         for (Edge e : edgeList) {
             e.draw(graphic);
@@ -678,68 +683,68 @@ public class Canvas {
     }
 
     private void drawPairInfoBox(Graphics g) {
-    if (currentPairVP == null) return;
+        if (currentPairVP == null) return;
 
-    Vertex v1 = currentPairVP.vertex1;
-    Vertex v2 = currentPairVP.vertex2;
+        Vertex v1 = currentPairVP.vertex1;
+        Vertex v2 = currentPairVP.vertex2;
 
-    boolean adjacent = false;
-    for (Edge e : edgeList) {
-        if ((e.vertex1 == v1 && e.vertex2 == v2) ||
-            (!e.directed && e.vertex1 == v2 && e.vertex2 == v1)) {
-            adjacent = true; break;
+        boolean adjacent = false;
+        for (Edge e : edgeList) {
+            if ((e.vertex1 == v1 && e.vertex2 == v2) ||
+                (!e.directed && e.vertex1 == v2 && e.vertex2 == v1)) {
+                adjacent = true; break;
+            }
         }
-    }
 
-    int dist = currentPairVP.getShortestDistance();     // weighted (Dijkstra)
-    boolean reachable = dist != -1;
-    Vector<Vertex> geodesic = currentPairVP.getShortestPath();
+        int dist = currentPairVP.getShortestDistance();
+        boolean reachable = dist != -1;
+        Vector<Vertex> geodesic = currentPairVP.getShortestPath();
 
-    String geodesicStr = "";
-    if (geodesic != null) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < geodesic.size(); i++) {
-            if (i > 0) sb.append("→");
-            sb.append(geodesic.get(i).name);
+        String geodesicStr = "";
+        if (geodesic != null) {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < geodesic.size(); i++) {
+                if (i > 0) sb.append("\u2192");
+                sb.append(geodesic.get(i).name);
+            }
+            geodesicStr = sb.length() > 28 ? sb.substring(0, 25) + "..." : sb.toString();
         }
-        geodesicStr = sb.length() > 28 ? sb.substring(0, 25) + "..." : sb.toString();
-    }
 
-    int pathCount = currentPairVP.pathList != null ? currentPairVP.pathList.size() : 0;
+        int pathCount = currentPairVP.pathList != null ? currentPairVP.pathList.size() : 0;
 
-    int maxWidth = 0;
-    if (currentPairVP.VertexDisjointContainer != null) {
-        for (Vector<Vector<Vertex>> c : currentPairVP.VertexDisjointContainer) {
-            if (c.size() > maxWidth) maxWidth = c.size();
+        int maxWidth = 0;
+        if (currentPairVP.VertexDisjointContainer != null) {
+            for (Vector<Vector<Vertex>> c : currentPairVP.VertexDisjointContainer) {
+                if (c.size() > maxWidth) maxWidth = c.size();
+            }
         }
+
+        String pairLabel = v1.name + " \u2192 " + v2.name;
+
+        int x = 190, y = 10, w = 280, h = 178;
+        g.setColor(new Color(240, 248, 255));
+        g.fillRect(x, y, w, h);
+        g.setColor(Color.BLACK);
+        g.drawRect(x, y, w, h);
+
+        int ty = y + 15;
+        int lx = x + 6;
+        g.drawString("Ordered pair: (" + pairLabel + ")",          lx, ty); ty += 15;
+        g.drawString("Adjacent: " + adjacent,                      lx, ty); ty += 15;
+        g.drawString("Reachable: " + reachable,                    lx, ty); ty += 15;
+        g.drawString("Geodesic dist (weighted): " + (reachable ? dist : "\u221E"), lx, ty); ty += 15;
+        if (!geodesicStr.isEmpty()) {
+            g.drawString("Geodesic path: " + geodesicStr,          lx, ty); ty += 15;
+        } else {
+            g.drawString("Geodesic path: N/A",                     lx, ty); ty += 15;
+        }
+        g.drawString("Simple paths (Walk\u2229no-repeat): " + pathCount, lx, ty); ty += 15;
+        g.drawString("Max vertex-disjoint width: " + maxWidth,     lx, ty); ty += 15;
+        boolean closed = (v1 == v2);
+        g.drawString("Closed walk possible: " + closed,            lx, ty); ty += 15;
+        g.drawString("Trail/Path exists: " + reachable,            lx, ty); ty += 15;
+        g.drawString("Tour (closed trail): " + closed,             lx, ty);
     }
-
-    String pairLabel = v1.name + " → " + v2.name;
-
-    int x = 190, y = 10, w = 280, h = 178;
-    g.setColor(new Color(240, 248, 255));
-    g.fillRect(x, y, w, h);
-    g.setColor(Color.BLACK);
-    g.drawRect(x, y, w, h);
-
-    int ty = y + 15;
-    int lx = x + 6;
-    g.drawString("Ordered pair: (" + pairLabel + ")",          lx, ty); ty += 15;
-    g.drawString("Adjacent: " + adjacent,                      lx, ty); ty += 15;
-    g.drawString("Reachable: " + reachable,                    lx, ty); ty += 15;
-    g.drawString("Geodesic dist (weighted): " + (reachable ? dist : "∞"), lx, ty); ty += 15;
-    if (!geodesicStr.isEmpty()) {
-        g.drawString("Geodesic path: " + geodesicStr,          lx, ty); ty += 15;
-    } else {
-        g.drawString("Geodesic path: N/A",                     lx, ty); ty += 15;
-    }
-    g.drawString("Simple paths (Walk∩no-repeat): " + pathCount, lx, ty); ty += 15;
-    g.drawString("Max vertex-disjoint width: " + maxWidth,     lx, ty); ty += 15;
-    boolean closed = (v1 == v2);
-    g.drawString("Closed walk possible: " + closed,            lx, ty); ty += 15;
-    g.drawString("Trail/Path exists: " + reachable,            lx, ty); ty += 15;
-    g.drawString("Tour (closed trail): " + closed,             lx, ty);
-}
 
     private class CanvasPane extends JPanel {
 
@@ -778,7 +783,11 @@ public class Canvas {
                                 0, 0, null);
                     g.draw3DRect(0, 0, width / 2, height / 2, true);
 
-                    drawString("Graph disconnects when nodes in color red are removed.", 100, height - 30, 20);
+                    drawString("\u03BA(G) = " + gP.vertexConnectivityValue
+                               + " \u2014 graph disconnects when the "
+                               + gP.witnessVertices.size()
+                               + " red node(s) are removed.",
+                               100, height - 30, 20);
                     g.setColor(Color.black);
                     break;
                 }

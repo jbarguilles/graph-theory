@@ -6,6 +6,7 @@ package graphtheory;
 
 import java.awt.Color;
 import java.awt.Graphics;
+import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
@@ -23,6 +24,12 @@ public class GraphProperties {
     public int[][] weightedAdjacencyMatrix;   // 0 = no edge, else weight
     public int[][] distanceMatrix;
     public Vector<VertexPair> vpList;
+
+    /** Witness set of size κ(G) whose removal disconnects (or reduces) the graph. */
+    public Vector<Vertex> witnessVertices = new Vector<Vertex>();
+
+    /** κ(G): minimum number of vertices whose removal disconnects the graph. */
+    public int vertexConnectivityValue = 0;
 
     public int[][] generateAdjacencyMatrix(Vector<Vertex> vList, Vector<Edge> eList) {
         adjacencyMatrix = new int[vList.size()][vList.size()];
@@ -47,7 +54,7 @@ public class GraphProperties {
     /**
      * Weighted shortest paths between all pairs via Dijkstra per source.
      * Uses EdgeRegistry, which Canvas.refresh() keeps in sync.
-     * Unreachable pairs get -1.
+     * Unreachable pairs get -1 (rendered as ∞ in the matrix display).
      */
     public int[][] generateDistanceMatrix(Vector<Vertex> vList) {
         distanceMatrix = new int[vList.size()][vList.size()];
@@ -134,23 +141,23 @@ public class GraphProperties {
     }
 
     public void drawDistanceMatrix(Graphics g, Vector<Vertex> vList, int x, int y) {
-    int cSize = 20;
-    g.setColor(Color.LIGHT_GRAY);
-    g.fillRect(x, y - 30, vList.size() * cSize + cSize, vList.size() * cSize + cSize);
-    g.setColor(Color.black);
-    g.drawString("ShortestPathMatrix (weighted; ∞ = unreachable)", x, y - cSize);
-    for (int i = 0; i < vList.size(); i++) {
-        g.setColor(Color.RED);
-        g.drawString(vList.get(i).name, x + cSize + i * cSize, y);
-        g.drawString(vList.get(i).name, x, cSize + i * cSize + y);
+        int cSize = 20;
+        g.setColor(Color.LIGHT_GRAY);
+        g.fillRect(x, y - 30, vList.size() * cSize + cSize, vList.size() * cSize + cSize);
         g.setColor(Color.black);
-        for (int j = 0; j < vList.size(); j++) {
-            int d = distanceMatrix[i][j];
-            String cell = (d < 0) ? "∞" : ("" + d);
-            g.drawString(cell, x + cSize * (j + 1), y + cSize * (i + 1));
+        g.drawString("ShortestPathMatrix (weighted; \u221E = unreachable)", x, y - cSize);
+        for (int i = 0; i < vList.size(); i++) {
+            g.setColor(Color.RED);
+            g.drawString(vList.get(i).name, x + cSize + i * cSize, y);
+            g.drawString(vList.get(i).name, x, cSize + i * cSize + y);
+            g.setColor(Color.black);
+            for (int j = 0; j < vList.size(); j++) {
+                int d = distanceMatrix[i][j];
+                String cell = (d < 0) ? "\u221E" : ("" + d);
+                g.drawString(cell, x + cSize * (j + 1), y + cSize * (i + 1));
+            }
         }
     }
-}
 
     public void drawNodePropertiesTable(Graphics g, Vector<Vertex> vList, int x, int y) {
         int rowH = 18;
@@ -222,7 +229,7 @@ public class GraphProperties {
         return -1;
     }
 
-    // ---- Connectivity ----
+    // ---- Connectivity (private helper used by Euler checks) ----
 
     private boolean isConnected(Vector<Vertex> vList) {
         if (vList.isEmpty()) return true;
@@ -339,6 +346,7 @@ public class GraphProperties {
             "Order |V|: " + order,
             "Size |E|: " + size,
             "Magnitude |V|+|E|: " + magnitude,
+            "Connectivity \u03BA(G): " + vertexConnectivityValue,
             "Bridges: " + bridgeCount + (bridgeCount > 0 ? " (purple)" : ""),
             "Euler Circuit: " + (eulerCircuit ? "Yes" : "No"),
             "Euler Path (Trail): " + (eulerPath ? "Yes" : "No"),
@@ -426,77 +434,128 @@ public class GraphProperties {
         return neighbors;
     }
 
-    public Vector<Vertex> vertexConnectivity(Vector<Vertex> vList) {
-        Vector<Vertex> origList = new Vector<Vertex>();
-        Vector<Vertex> tempList = new Vector<Vertex>();
-        Vector<Vertex> toBeRemoved = new Vector<Vertex>();
-        Vertex victim;
+    // ---- Vertex connectivity κ(G) ----
 
-        origList.setSize(vList.size());
-        Collections.copy(origList, vList);
+    /**
+     * Computes κ(G): the minimum number of vertices whose removal either
+     * disconnects G or reduces it to a single vertex.
+     *
+     * Brute-force over all subsets of size 0, 1, 2, ... — exponential, but
+     * fast enough for teaching-sized graphs (≤ ~20 vertices). Uses all edge
+     * types (undirected, in, out) for the connectivity check.
+     *
+     * Side effects:
+     *   - vertexConnectivityValue = κ(G)
+     *   - witnessVertices = a minimum cut set of that size
+     */
+    public int vertexConnectivity(Vector<Vertex> vList) {
+        witnessVertices = new Vector<Vertex>();
+        vertexConnectivityValue = 0;
 
-        int maxPossibleRemove = 0;
-        while (graphConnectivity(origList)) {
-            Collections.sort(origList, new ascendingDegreeComparator());
-            maxPossibleRemove = origList.firstElement().getDegree();
+        int n = vList.size();
+        if (n <= 1) return 0;
 
-            for (Vertex v : origList) {
-                if (v.getDegree() == maxPossibleRemove) {
-                    for (Vertex z : v.undirectedNeighbors) {
-                        if (!tempList.contains(z)) {
-                            tempList.add(z);
-                        }
-                    }
-                }
-            }
-
-            while (graphConnectivity(origList) && tempList.size() > 0) {
-                Collections.sort(tempList, new descendingDegreeComparator());
-                victim = tempList.firstElement();
-                tempList.removeElementAt(0);
-                origList.remove(victim);
-                for (Vertex x : origList) {
-                    x.undirectedNeighbors.remove(victim);
-                }
-                toBeRemoved.add(victim);
-            }
-            tempList.removeAllElements();
+        // Fast path: already disconnected → κ = 0
+        if (!isWeaklyConnected(vList, new HashSet<Vertex>())) {
+            return 0;
         }
 
-        return toBeRemoved;
-    }
-
-    private boolean graphConnectivity(Vector<Vertex> vList) {
-        Vector<Vertex> visitedList = new Vector<Vertex>();
-        recurseGraphConnectivity(vList.firstElement().undirectedNeighbors, visitedList);
-        return visitedList.size() == vList.size();
-    }
-
-    private void recurseGraphConnectivity(Vector<Vertex> vList, Vector<Vertex> visitedList) {
-        for (Vertex v : vList) {
-            if (!visitedList.contains(v)) {
-                visitedList.add(v);
-                recurseGraphConnectivity(v.undirectedNeighbors, visitedList);
+        // Try subsets of increasing size
+        for (int k = 1; k < n; k++) {
+            Vector<Vertex> cut = new Vector<Vertex>();
+            if (findCutOfSize(vList, k, 0, cut)) {
+                vertexConnectivityValue = k;
+                witnessVertices = cut;
+                return k;
             }
         }
+
+        // Fallback: need to remove n-1 vertices (complete graph)
+        vertexConnectivityValue = n - 1;
+        for (int i = 0; i < n - 1; i++) {
+            witnessVertices.add(vList.get(i));
+        }
+        return n - 1;
     }
 
-    private class ascendingDegreeComparator implements Comparator {
-        public int compare(Object v1, Object v2) {
-            if (((Vertex) v1).getDegree() > ((Vertex) v2).getDegree()) return 1;
-            else if (((Vertex) v1).getDegree() < ((Vertex) v2).getDegree()) return -1;
-            else return 0;
+    private boolean findCutOfSize(Vector<Vertex> vList, int k, int start, Vector<Vertex> out) {
+        if (out.size() == k) {
+            if (!isWeaklyConnected(vList, new HashSet<Vertex>(out))) {
+                return true;
+            }
+            return false;
+        }
+        for (int i = start; i < vList.size(); i++) {
+            Vertex v = vList.get(i);
+            out.add(v);
+            if (findCutOfSize(vList, k, i + 1, out)) return true;
+            out.remove(out.size() - 1);
+        }
+        return false;
+    }
+
+    /**
+ * True if the graph, with `removed` vertices excluded, is weakly connected.
+ *
+ * Convention:
+ *  - 0 remaining vertices: trivially connected.
+ *  - 1 remaining vertex:   trivially connected.
+ *  - Otherwise, look only at vertices with at least one edge (isolated
+ *    vertices don't help connectivity). If those form >1 component
+ *    (i.e. BFS doesn't reach all of them), the graph is disconnected.
+ *  - If there are 0 or 1 non-isolated vertices but ≥ 2 remaining vertices,
+ *    every vertex is isolated, so the graph is disconnected.
+ */
+private boolean isWeaklyConnected(Vector<Vertex> vList, Set<Vertex> removed) {
+    Vector<Vertex> alive = new Vector<Vertex>();
+    for (Vertex v : vList) {
+        if (removed.contains(v)) continue;
+        alive.add(v);
+    }
+    if (alive.size() <= 1) return true;
+
+    // Gather the non-isolated vertices among the alive set.
+    Vector<Vertex> nonIsolated = new Vector<Vertex>();
+    for (Vertex v : alive) {
+        boolean hasAnyEdge =
+            !v.undirectedNeighbors.isEmpty() ||
+            !v.inNeighbors.isEmpty() ||
+            !v.outNeighbors.isEmpty();
+        if (hasAnyEdge) nonIsolated.add(v);
+    }
+
+    // No vertex has any edge, but there are ≥ 2 of them → disconnected.
+    if (nonIsolated.isEmpty()) return false;
+
+    // BFS starting from one non-isolated vertex, only through alive, non-removed vertices.
+    Set<Vertex> visited = new HashSet<Vertex>();
+    ArrayDeque<Vertex> queue = new ArrayDeque<Vertex>();
+    Vertex start = nonIsolated.firstElement();
+    visited.add(start);
+    queue.add(start);
+
+    while (!queue.isEmpty()) {
+        Vertex u = queue.poll();
+        for (Vertex n : u.undirectedNeighbors) {
+            if (removed.contains(n) || !alive.contains(n)) continue;
+            if (visited.add(n)) queue.add(n);
+        }
+        for (Vertex n : u.outNeighbors) {
+            if (removed.contains(n) || !alive.contains(n)) continue;
+            if (visited.add(n)) queue.add(n);
+        }
+        for (Vertex n : u.inNeighbors) {
+            if (removed.contains(n) || !alive.contains(n)) continue;
+            if (visited.add(n)) queue.add(n);
         }
     }
 
-    private class descendingDegreeComparator implements Comparator {
-        public int compare(Object v1, Object v2) {
-            if (((Vertex) v1).getDegree() > ((Vertex) v2).getDegree()) return -1;
-            else if (((Vertex) v1).getDegree() < ((Vertex) v2).getDegree()) return 1;
-            else return 0;
-        }
+    // Every non-isolated vertex must have been reached.
+    for (Vertex v : nonIsolated) {
+        if (!visited.contains(v)) return false;
     }
-
+    return true;
+}
     private class descendingWidthComparator implements Comparator {
         public int compare(Object v1, Object v2) {
             if (((Vector<Vertex>) v1).size() > (((Vector<Vertex>) v2).size())) return -1;
