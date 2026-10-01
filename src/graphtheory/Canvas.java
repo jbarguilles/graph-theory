@@ -20,6 +20,8 @@ public class Canvas {
     public JFrame frame;
     private JMenuBar menuBar;
     private CanvasPane canvas;
+    private JScrollPane propertiesScroll;
+    private JPanel propertiesContent;
     private Graphics2D graphic;
     private Color backgroundColour;
     private Image canvasImage,  canvasImage2;
@@ -134,6 +136,109 @@ public class Canvas {
 
         vertexList = new Vector<Vertex>();
         edgeList = new Vector<Edge>();
+
+        // Build the scrollable Properties content panel.
+        buildPropertiesPanel();
+    }
+
+    /**
+     * Build the JScrollPane + content panel used by the Properties window.
+     * The content panel paints the whole Properties view (matrices, node
+     * table, graph summary, captions) and reports its preferred size so the
+     * scroll pane can show a scrollbar when the content is taller than the
+     * window.
+     */
+    private void buildPropertiesPanel() {
+    propertiesContent = new JPanel() {
+        @Override
+        public void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            Graphics2D g2 = (Graphics2D) g;
+
+            int w = getWidth();
+            int h = getHeight();
+            g2.setColor(Color.WHITE);
+            g2.fillRect(0, 0, w, h);
+
+            // Left column: Graph preview
+            g2.drawImage(canvasImage.getScaledInstance(width / 2, height / 2, Image.SCALE_SMOOTH),
+                         10, 10, null);
+            g2.setColor(Color.BLACK);
+            g2.draw3DRect(10, 10, width / 2, height / 2, true);
+
+            // Right column: Adjacency Matrix + Distance Matrix + Graph Summary
+            int rightX = width / 2 + 60;
+            int adjY = 50;
+            gP.drawAdjacencyMatrix(g2, vertexList, rightX, adjY);
+            int adjHeight = (vertexList.size() + 1) * 20 + 30;
+
+            int distY = adjY + adjHeight + 20;
+            gP.drawDistanceMatrix(g2, vertexList, rightX, distY);
+            int distHeight = (vertexList.size() + 1) * 20 + 30;
+
+            int summaryY = distY + distHeight + 20;
+            int summaryHeight = gP.drawGraphSummary(g2, vertexList, edgeList, rightX, summaryY);
+
+            // Left column below the preview: Node Properties
+            int nodeY = height / 2 + 90;
+            gP.drawNodePropertiesTable(g2, vertexList, 10, nodeY);
+
+            // Bottom captions: κ(G), λ(G), legend. Pinned at the greater of:
+            //   - below the tallest column (so it doesn't overlap content)
+            //   - 40 px above the panel's bottom edge (so it isn't clipped
+            //     when the panel is taller than the columns)
+            int captionY = Math.max(
+                    nodeY + (vertexList.size() + 2) * 18 + 40,
+                    summaryY + summaryHeight + 40);
+            captionY = Math.max(captionY, h - 40);
+
+            g2.setColor(Color.BLACK);
+            g2.setFont(g2.getFont().deriveFont(20f));
+            // g2.drawString("\u03BA(G) = " + gP.vertexConnectivityValue
+            //               + "   \u03BB(G) = " + gP.edgeConnectivityValue,
+            //               100, captionY);
+            // g2.setFont(g2.getFont().deriveFont(12f));
+            // g2.drawString("red vertices = vertex cut, red edges = edge cut",
+            //               100, captionY + 20);
+        }
+    };
+    propertiesContent.setBackground(Color.WHITE);
+
+    propertiesScroll = new JScrollPane(propertiesContent);
+    propertiesScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+    propertiesScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+    propertiesScroll.getVerticalScrollBar().setUnitIncrement(16);
+}
+
+    /**
+     * Compute the content panel's preferred size so the scroll pane knows how
+     * tall the content is. Called whenever the graph changes and whenever the
+     * Properties window is opened.
+     */
+    private void refreshPropertiesScrollSize() {
+        if (propertiesContent == null) return;
+
+        int matrixRows = vertexList.size() + 1;
+        int matrixHeight = matrixRows * 20 + 30;    // each matrix
+
+        // Right column total height: adj + gap + dist + gap + summary
+        int rightHeight = 50
+                        + matrixHeight + 20
+                        + matrixHeight + 20
+                        + 12 * 16 + 20;             // summary box approx
+        // Left column total height: preview + gap + node table + captions
+        int leftHeight = 10
+                       + height / 2 + 20
+                       + (vertexList.size() + 2) * 18 + 30
+                       + 80;
+
+        int neededHeight = Math.max(rightHeight, leftHeight) + 60;
+        neededHeight = Math.max(neededHeight, height);
+        int neededWidth = Math.max(width + 40, width / 2 + 60 + 400);
+
+        propertiesContent.setPreferredSize(new Dimension(neededWidth, neededHeight));
+        propertiesContent.revalidate();
+        propertiesContent.repaint();
     }
 
     private void updateHover(int mx, int my) {
@@ -533,6 +638,9 @@ public class Canvas {
                     loadFile(fileManager.loadFile(fileManager.jF.getSelectedFile()));
                     System.out.println(fileManager.jF.getSelectedFile());
                     selectedWindow = 0;
+                    frame.setContentPane(canvas);
+                    frame.revalidate();
+                    frame.repaint();
                 }
             } else if (command.equals("Save to File")) {
                 int returnValue = fileManager.jF.showSaveDialog(frame);
@@ -542,25 +650,36 @@ public class Canvas {
                 }
             } else if (command.equals("Graph")) {
                 selectedWindow = 0;
+                frame.setContentPane(canvas);
+                frame.revalidate();
+                frame.repaint();
             } else if (command.equals("Properties")) {
                 selectedWindow = 1;
                 if (vertexList.size() > 0) {
                     int[][] matrix = gP.generateAdjacencyMatrix(vertexList, edgeList);
 
-                    // Compute κ(G) and highlight the witness set (red).
+                    // Compute κ(G) and λ(G); highlight witness sets.
                     gP.vertexConnectivity(vertexList);
+                    gP.edgeConnectivity(vertexList, edgeList);
 
-                    // Clear previous red marks, then mark only the witness vertices.
+                    // Clear previous red marks, then mark only the witness
+                    // vertices and witness edges.
                     for (Vertex v : vertexList) v.wasClicked = false;
-                    for (Vertex v : gP.witnessVertices) {
-                        v.wasClicked = true;
-                    }
+                    for (Edge ed : edgeList)    ed.wasClicked = false;
+
+                    for (Vertex v : gP.witnessVertices) v.wasClicked = true;
+                    for (Edge ed : gP.witnessEdges)     ed.wasClicked = true;
 
                     reloadVertexConnections(matrix, vertexList);
 
                     gP.generateDistanceMatrix(vertexList);
                     gP.displayContainers(vertexList);
                 }
+
+                refreshPropertiesScrollSize();
+                frame.setContentPane(propertiesScroll);
+                frame.revalidate();
+                frame.repaint();
             }
 
             refresh();
@@ -618,6 +737,9 @@ public class Canvas {
             v.draw(graphic);
         }
         canvas.repaint();
+        if (propertiesContent != null) {
+            propertiesContent.repaint();
+        }
     }
 
     public void setVisible(boolean visible) {
@@ -760,35 +882,10 @@ public class Canvas {
                     g.setColor(Color.black);
                     break;
                 }
+                // case 1 (Properties) is no longer drawn here — it lives
+                // inside the propertiesContent JPanel hosted by propertiesScroll.
                 case 1: {
-                    Graphics g2 = canvasImage2.getGraphics();
-                    g2.clearRect(0, 0, width, height);
-
-                    int rightX = width / 2 + 60;
-                    int adjY = 50;
-                    gP.drawAdjacencyMatrix(g2, vertexList, rightX, adjY);
-                    int adjHeight = (vertexList.size() + 1) * 20 + 30;
-
-                    int distY = adjY + adjHeight + 20;
-                    gP.drawDistanceMatrix(g2, vertexList, rightX, distY);
-                    int distHeight = (vertexList.size() + 1) * 20 + 30;
-
-                    int summaryY = distY + distHeight + 20;
-                    gP.drawGraphSummary(g2, vertexList, edgeList, rightX, summaryY);
-
-                    gP.drawNodePropertiesTable(g2, vertexList, 10, height / 2 + 90);
-
-                    g.drawImage(canvasImage2, 0, 0, null);
-                    g.drawImage(canvasImage.getScaledInstance(width / 2, height / 2, Image.SCALE_SMOOTH),
-                                0, 0, null);
-                    g.draw3DRect(0, 0, width / 2, height / 2, true);
-
-                    drawString("\u03BA(G) = " + gP.vertexConnectivityValue
-                               + " \u2014 graph disconnects when the "
-                               + gP.witnessVertices.size()
-                               + " red node(s) are removed.",
-                               100, height - 30, 20);
-                    g.setColor(Color.black);
+                    // No-op. The frame's content pane is the scroll pane.
                     break;
                 }
             }

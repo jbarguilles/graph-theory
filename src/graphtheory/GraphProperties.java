@@ -31,6 +31,12 @@ public class GraphProperties {
     /** κ(G): minimum number of vertices whose removal disconnects the graph. */
     public int vertexConnectivityValue = 0;
 
+    /** Witness set of size λ(G) whose removal disconnects (or reduces) the graph. */
+    public Vector<Edge> witnessEdges = new Vector<Edge>();
+
+    /** λ(G): minimum number of edges whose removal disconnects the graph. */
+    public int edgeConnectivityValue = 0;
+
     public int[][] generateAdjacencyMatrix(Vector<Vertex> vList, Vector<Edge> eList) {
         adjacencyMatrix = new int[vList.size()][vList.size()];
         weightedAdjacencyMatrix = new int[vList.size()][vList.size()];
@@ -66,7 +72,7 @@ public class GraphProperties {
                     continue;
                 }
                 VertexPair vp = new VertexPair(vList.get(i), vList.get(j));
-                distanceMatrix[i][j] = vp.getShortestDistance();   // -1 if unreachable
+                distanceMatrix[i][j] = vp.getShortestDistance();
             }
         }
         return distanceMatrix;
@@ -229,7 +235,7 @@ public class GraphProperties {
         return -1;
     }
 
-    // ---- Connectivity (private helper used by Euler checks) ----
+    // ---- Connectivity for Euler checks (isolated vertices ignored) ----
 
     private boolean isConnected(Vector<Vertex> vList) {
         if (vList.isEmpty()) return true;
@@ -301,7 +307,7 @@ public class GraphProperties {
         return false;
     }
 
-    // ---- Graph summary ----
+    // ---- Graph summary (with κ(G), λ(G), and V/E sets) ----
 
     public int drawGraphSummary(Graphics g, Vector<Vertex> vList, Vector<Edge> eList, int x, int y) {
         int bridgeCount = 0;
@@ -347,6 +353,7 @@ public class GraphProperties {
             "Size |E|: " + size,
             "Magnitude |V|+|E|: " + magnitude,
             "Connectivity \u03BA(G): " + vertexConnectivityValue,
+            "Edge connectivity \u03BB(G): " + edgeConnectivityValue,
             "Bridges: " + bridgeCount + (bridgeCount > 0 ? " (purple)" : ""),
             "Euler Circuit: " + (eulerCircuit ? "Yes" : "No"),
             "Euler Path (Trail): " + (eulerPath ? "Yes" : "No"),
@@ -436,18 +443,6 @@ public class GraphProperties {
 
     // ---- Vertex connectivity κ(G) ----
 
-    /**
-     * Computes κ(G): the minimum number of vertices whose removal either
-     * disconnects G or reduces it to a single vertex.
-     *
-     * Brute-force over all subsets of size 0, 1, 2, ... — exponential, but
-     * fast enough for teaching-sized graphs (≤ ~20 vertices). Uses all edge
-     * types (undirected, in, out) for the connectivity check.
-     *
-     * Side effects:
-     *   - vertexConnectivityValue = κ(G)
-     *   - witnessVertices = a minimum cut set of that size
-     */
     public int vertexConnectivity(Vector<Vertex> vList) {
         witnessVertices = new Vector<Vertex>();
         vertexConnectivityValue = 0;
@@ -495,67 +490,193 @@ public class GraphProperties {
     }
 
     /**
- * True if the graph, with `removed` vertices excluded, is weakly connected.
+     * True if the graph, with `removed` vertices excluded, is weakly connected.
+     *
+     * Convention:
+     *  - 0 or 1 remaining vertex: trivially connected.
+     *  - ≥ 2 remaining vertices, all isolated: disconnected.
+     *  - Otherwise, only non-isolated vertices matter for connectivity.
+     */
+    private boolean isWeaklyConnected(Vector<Vertex> vList, Set<Vertex> removed) {
+        Vector<Vertex> alive = new Vector<Vertex>();
+        for (Vertex v : vList) {
+            if (removed.contains(v)) continue;
+            alive.add(v);
+        }
+        if (alive.size() <= 1) return true;
+
+        // Non-isolated vertices among the alive set.
+        Vector<Vertex> nonIsolated = new Vector<Vertex>();
+        for (Vertex v : alive) {
+            boolean hasAnyEdge =
+                !v.undirectedNeighbors.isEmpty() ||
+                !v.inNeighbors.isEmpty() ||
+                !v.outNeighbors.isEmpty();
+            if (hasAnyEdge) nonIsolated.add(v);
+        }
+
+        // ≥ 2 alive vertices, none with any edge → disconnected.
+        if (nonIsolated.isEmpty()) return false;
+
+        // BFS over alive, non-isolated vertices.
+        Set<Vertex> visited = new HashSet<Vertex>();
+        ArrayDeque<Vertex> queue = new ArrayDeque<Vertex>();
+        Vertex start = nonIsolated.firstElement();
+        visited.add(start);
+        queue.add(start);
+
+        while (!queue.isEmpty()) {
+            Vertex u = queue.poll();
+            for (Vertex n : u.undirectedNeighbors) {
+                if (removed.contains(n) || !alive.contains(n)) continue;
+                if (visited.add(n)) queue.add(n);
+            }
+            for (Vertex n : u.outNeighbors) {
+                if (removed.contains(n) || !alive.contains(n)) continue;
+                if (visited.add(n)) queue.add(n);
+            }
+            for (Vertex n : u.inNeighbors) {
+                if (removed.contains(n) || !alive.contains(n)) continue;
+                if (visited.add(n)) queue.add(n);
+            }
+        }
+
+        for (Vertex v : nonIsolated) {
+            if (!visited.contains(v)) return false;
+        }
+        return true;
+    }
+
+    // ---- Edge connectivity λ(G) ----
+
+    /**
+     * Computes λ(G): the minimum number of edges whose removal either
+     * disconnects G or reduces it to a single vertex.
+     *
+     * Brute-force over all subsets of edges of size 0, 1, 2, ... — exponential
+     * in |E|, but fast enough for teaching-sized graphs.
+     *
+     * Side effects:
+     *   - edgeConnectivityValue = λ(G)
+     *   - witnessEdges = a minimum cut set of that size
+     */
+    public int edgeConnectivity(Vector<Vertex> vList, Vector<Edge> eList) {
+        witnessEdges = new Vector<Edge>();
+        edgeConnectivityValue = 0;
+
+        int n = vList.size();
+        if (n <= 1) return 0;
+
+        // Fast path: already disconnected → λ = 0
+        if (!isWeaklyConnected(vList, new HashSet<Vertex>())) {
+            return 0;
+        }
+
+        int m = eList.size();
+        if (m == 0) return 0;   // no edges, ≥ 2 vertices → disconnected
+
+        // Try edge subsets of increasing size
+        for (int k = 1; k <= m; k++) {
+            Vector<Edge> cut = new Vector<Edge>();
+            if (findEdgeCutOfSize(vList, eList, k, 0, cut)) {
+                edgeConnectivityValue = k;
+                witnessEdges = cut;
+                return k;
+            }
+        }
+
+        // Shouldn't reach here — removing all edges definitely disconnects
+        edgeConnectivityValue = m;
+        witnessEdges = new Vector<Edge>(eList);
+        return m;
+    }
+
+    private boolean findEdgeCutOfSize(Vector<Vertex> vList, Vector<Edge> eList,
+                                      int k, int start, Vector<Edge> out) {
+        if (out.size() == k) {
+            if (!isWeaklyConnectedWithoutEdges(vList, out)) {
+                return true;
+            }
+            return false;
+        }
+        for (int i = start; i < eList.size(); i++) {
+            Edge e = eList.get(i);
+            out.add(e);
+            if (findEdgeCutOfSize(vList, eList, k, i + 1, out)) return true;
+            out.remove(out.size() - 1);
+        }
+        return false;
+    }
+
+    /**
+ * Same convention as isWeaklyConnected, but the "removed" objects are
+ * edges. Vertices remain all alive; edges in `removedEdges` are ignored.
  *
- * Convention:
- *  - 0 remaining vertices: trivially connected.
- *  - 1 remaining vertex:   trivially connected.
- *  - Otherwise, look only at vertices with at least one edge (isolated
- *    vertices don't help connectivity). If those form >1 component
- *    (i.e. BFS doesn't reach all of them), the graph is disconnected.
- *  - If there are 0 or 1 non-isolated vertices but ≥ 2 remaining vertices,
- *    every vertex is isolated, so the graph is disconnected.
+ * For λ(G), an isolated vertex after the cut still counts — the graph
+ * is disconnected. Only the trivial case n <= 1 is treated as connected.
  */
-private boolean isWeaklyConnected(Vector<Vertex> vList, Set<Vertex> removed) {
-    Vector<Vertex> alive = new Vector<Vertex>();
-    for (Vertex v : vList) {
-        if (removed.contains(v)) continue;
-        alive.add(v);
-    }
-    if (alive.size() <= 1) return true;
+private boolean isWeaklyConnectedWithoutEdges(Vector<Vertex> vList, Vector<Edge> removedEdges) {
+    int n = vList.size();
+    if (n <= 1) return true;
 
-    // Gather the non-isolated vertices among the alive set.
-    Vector<Vertex> nonIsolated = new Vector<Vertex>();
-    for (Vertex v : alive) {
-        boolean hasAnyEdge =
-            !v.undirectedNeighbors.isEmpty() ||
-            !v.inNeighbors.isEmpty() ||
-            !v.outNeighbors.isEmpty();
-        if (hasAnyEdge) nonIsolated.add(v);
-    }
-
-    // No vertex has any edge, but there are ≥ 2 of them → disconnected.
-    if (nonIsolated.isEmpty()) return false;
-
-    // BFS starting from one non-isolated vertex, only through alive, non-removed vertices.
+    // BFS from any vertex, walking only surviving edges.
     Set<Vertex> visited = new HashSet<Vertex>();
     ArrayDeque<Vertex> queue = new ArrayDeque<Vertex>();
-    Vertex start = nonIsolated.firstElement();
+    Vertex start = vList.firstElement();
     visited.add(start);
     queue.add(start);
 
     while (!queue.isEmpty()) {
         Vertex u = queue.poll();
-        for (Vertex n : u.undirectedNeighbors) {
-            if (removed.contains(n) || !alive.contains(n)) continue;
-            if (visited.add(n)) queue.add(n);
+
+        // undirected
+        for (Vertex w : u.undirectedNeighbors) {
+            if (!edgeIsRemoved(u, w, removedEdges)) {
+                if (visited.add(w)) queue.add(w);
+            }
         }
-        for (Vertex n : u.outNeighbors) {
-            if (removed.contains(n) || !alive.contains(n)) continue;
-            if (visited.add(n)) queue.add(n);
+        // out
+        for (Vertex w : u.outNeighbors) {
+            if (!edgeIsRemoved(u, w, removedEdges)) {
+                if (visited.add(w)) queue.add(w);
+            }
         }
-        for (Vertex n : u.inNeighbors) {
-            if (removed.contains(n) || !alive.contains(n)) continue;
-            if (visited.add(n)) queue.add(n);
+        // in (u is the destination; w is the source)
+        for (Vertex w : u.inNeighbors) {
+            if (!edgeIsRemoved(w, u, removedEdges)) {
+                if (visited.add(w)) queue.add(w);
+            }
         }
     }
 
-    // Every non-isolated vertex must have been reached.
-    for (Vertex v : nonIsolated) {
+    // Every vertex must have been reached.
+    for (Vertex v : vList) {
         if (!visited.contains(v)) return false;
     }
     return true;
 }
+
+    /** True if u has at least one incident edge not in `removedEdges`. */
+    private boolean hasLiveIncidentEdge(Vertex u, Vector<Vertex> vList, Vector<Edge> removedEdges) {
+        for (Vertex w : u.undirectedNeighbors) if (!edgeIsRemoved(u, w, removedEdges)) return true;
+        for (Vertex w : u.outNeighbors)        if (!edgeIsRemoved(u, w, removedEdges)) return true;
+        for (Vertex w : u.inNeighbors)         if (!edgeIsRemoved(w, u, removedEdges)) return true;
+        return false;
+    }
+
+    /**
+     * True if the edge u→v (or undirected u—v) is in `removedEdges`.
+     * Matching ignores direction for undirected edges, but distinguishes
+     * antiparallel directed arcs.
+     */
+    private boolean edgeIsRemoved(Vertex u, Vertex v, Vector<Edge> removedEdges) {
+        for (Edge e : removedEdges) {
+            if (e.vertex1 == u && e.vertex2 == v) return true;
+            if (!e.directed && e.vertex1 == v && e.vertex2 == u) return true;
+        }
+        return false;
+    }
+
     private class descendingWidthComparator implements Comparator {
         public int compare(Object v1, Object v2) {
             if (((Vector<Vertex>) v1).size() > (((Vector<Vertex>) v2).size())) return -1;
