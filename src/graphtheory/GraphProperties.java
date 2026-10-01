@@ -366,6 +366,59 @@ public class GraphProperties {
         return isStronglyConnected(vList) ? "Yes" : "No";
     }
 
+    // ---- Simple / Multigraph ----
+
+    /**
+     * True if the graph is simple:
+     *   - no self-loops,
+     *   - no parallel edges (same pair joined by more than one edge in the
+     *     same direction),
+     *   - no mixing of a directed and an undirected edge on the same pair.
+     *
+     * Antiparallel directed arcs (u→v and v→u) are allowed — they are
+     * different ordered pairs and do not break simplicity.
+     *
+     * In practice, the UI prevents parallel edges, so this is almost always
+     * true. It exists to be honest if a malformed file introduces duplicates.
+     */
+    public boolean isSimple(Vector<Vertex> vList, Vector<Edge> eList) {
+        // 1) No self-loops
+        for (Edge e : eList) {
+            if (e.vertex1 == e.vertex2) return false;
+        }
+
+        // 2) No parallel edges and no mixed edge/arc on the same pair
+        for (int i = 0; i < eList.size(); i++) {
+            Edge a = eList.get(i);
+            for (int j = i + 1; j < eList.size(); j++) {
+                Edge b = eList.get(j);
+
+                // Both directed, same ordered pair → parallel
+                if (a.directed && b.directed
+                        && a.vertex1 == b.vertex1 && a.vertex2 == b.vertex2) {
+                    return false;
+                }
+
+                // Both undirected, same unordered pair → parallel
+                if (!a.directed && !b.directed) {
+                    boolean same =
+                            (a.vertex1 == b.vertex1 && a.vertex2 == b.vertex2) ||
+                            (a.vertex1 == b.vertex2 && a.vertex2 == b.vertex1);
+                    if (same) return false;
+                }
+
+                // Mixed: one directed, one undirected, same unordered pair
+                if (a.directed != b.directed) {
+                    boolean same =
+                            (a.vertex1 == b.vertex1 && a.vertex2 == b.vertex2) ||
+                            (a.vertex1 == b.vertex2 && a.vertex2 == b.vertex1);
+                    if (same) return false;
+                }
+            }
+        }
+        return true;
+    }
+
     // ---- Bipartite / Complete bipartite ----
 
     public boolean isBipartite(Vector<Vertex> vList) {
@@ -439,11 +492,6 @@ public class GraphProperties {
         return sides;
     }
 
-    /**
-     * True if the graph is a complete bipartite graph K_{m,n} with m,n >= 1.
-     * Uses the existing 2-coloring to find the bipartition, then verifies
-     * every cross-pair has an edge and no same-side edge exists.
-     */
     public boolean isCompleteBipartite(Vector<Vertex> vList, Vector<Edge> eList) {
         int n = vList.size();
         if (n < 2) return false;
@@ -471,14 +519,6 @@ public class GraphProperties {
         return crossEdges == m * k;
     }
 
-    /**
-     * Human-readable label for the Bipartite row.
-     *   "—"                                        for trivial graphs (n <= 1)
-     *   "No"                                       if not bipartite
-     *   "Yes — Complete K_{m,n}; A = {...}, B = {...}"
-     *                                              if bipartite AND complete bipartite
-     *   "Yes — A = {...}, B = {...}"               if bipartite but not complete
-     */
     public String bipartiteLabel(Vector<Vertex> vList, Vector<Edge> eList) {
         int n = vList.size();
         if (n <= 1) return "\u2014";
@@ -524,22 +564,10 @@ public class GraphProperties {
 
     // ---- Empty / Complete ----
 
-    /**
-     * True if the graph has no edges. Vertices may exist; they are all isolated.
-     * Convention: |V| <= 1 is treated as "—" in the display, not as a yes/no.
-     */
     public boolean isEmptyGraph(Vector<Vertex> vList, Vector<Edge> eList) {
         return eList.isEmpty();
     }
 
-    /**
-     * True if the graph is complete.
-     *  - Undirected: exactly one edge between every pair (n*(n-1)/2 edges).
-     *  - Directed:   exactly one arc in each direction for every ordered pair
-     *                of distinct vertices (n*(n-1) arcs).
-     *  - n <= 1: trivially complete.
-     * Mixed graphs are treated as not complete.
-     */
     public boolean isComplete(Vector<Vertex> vList, Vector<Edge> eList) {
         int n = vList.size();
         if (n <= 1) return true;
@@ -853,6 +881,10 @@ public class GraphProperties {
                 ? "\u2014"
                 : (isComplete(vList, eList) ? "Yes" : "No");
 
+        String simpleStr = vList.isEmpty()
+                ? "\u2014"
+                : (isSimple(vList, eList) ? "Yes" : "No");
+
         String cyclicStr = vList.isEmpty()
                 ? "\u2014"
                 : (isAcyclic(vList) ? "Acyclic" : "Cyclic");
@@ -873,6 +905,7 @@ public class GraphProperties {
             "Star: " + starStr,
             "Empty: " + emptyStr,
             "Complete: " + completeStr,
+            "Simple: " + simpleStr,
             "Cyclic/Acyclic: " + cyclicStr,
             "Bridges: " + bridgeCount + (bridgeCount > 0 ? " (purple)" : ""),
             "Euler Circuit: " + (eulerCircuit ? "Yes" : "No"),

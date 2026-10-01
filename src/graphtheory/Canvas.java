@@ -142,13 +142,9 @@ public class Canvas {
         vertexList = new Vector<Vertex>();
         edgeList = new Vector<Edge>();
 
-        // Build the scrollable Properties content panel.
         buildPropertiesPanel();
     }
 
-    /**
-     * Build the JScrollPane + content panel used by the Properties window.
-     */
     private void buildPropertiesPanel() {
         propertiesContent = new JPanel() {
             @Override
@@ -161,13 +157,11 @@ public class Canvas {
                 g2.setColor(Color.WHITE);
                 g2.fillRect(0, 0, w, h);
 
-                // Left column: Graph preview
                 g2.drawImage(canvasImage.getScaledInstance(width / 2, height / 2, Image.SCALE_SMOOTH),
                              10, 10, null);
                 g2.setColor(Color.BLACK);
                 g2.draw3DRect(10, 10, width / 2, height / 2, true);
 
-                // Right column: matrices + summary
                 int rightX = width / 2 + 60;
                 int adjY = 50;
                 gP.drawAdjacencyMatrix(g2, vertexList, rightX, adjY);
@@ -180,11 +174,9 @@ public class Canvas {
                 int summaryY = distY + distHeight + 20;
                 int summaryHeight = gP.drawGraphSummary(g2, vertexList, edgeList, rightX, summaryY);
 
-                // Left column below the preview: Node Properties
                 int nodeY = height / 2 + 90;
                 gP.drawNodePropertiesTable(g2, vertexList, 10, nodeY);
 
-                // Bottom captions
                 int captionY = Math.max(
                         nodeY + (vertexList.size() + 2) * 18 + 40,
                         summaryY + summaryHeight + 40);
@@ -192,7 +184,6 @@ public class Canvas {
 
                 g2.setColor(Color.BLACK);
                 g2.setFont(g2.getFont().deriveFont(20f));
-                // Caption drawing intentionally left blank.
             }
         };
         propertiesContent.setBackground(Color.WHITE);
@@ -209,10 +200,10 @@ public class Canvas {
         int matrixRows = vertexList.size() + 1;
         int matrixHeight = matrixRows * 20 + 30;
 
-       int rightHeight = 50
+        int rightHeight = 50
                 + matrixHeight + 20
                 + matrixHeight + 20
-                + 23 * 16 + 20;   // was 21 * 16 + 20
+                + 24 * 16 + 20;
         int leftHeight = 10
                        + height / 2 + 20
                        + (vertexList.size() + 2) * 18 + 30
@@ -293,6 +284,26 @@ public class Canvas {
         return visited;
     }
 
+    /**
+     * Returns the smallest non-negative integer (as a string) that is not
+     * already used as the name of a vertex in vertexList.
+     *
+     * Examples:
+     *  - Empty graph:           "0"
+     *  - {0, 1, 2}:             "3"
+     *  - {0, 2} (1 was removed):"1"
+     *  - {1, 2} (0 was removed):"0"
+     */
+    private String nextAvailableVertexName() {
+        Set<String> used = new HashSet<String>();
+        for (Vertex v : vertexList) {
+            used.add(v.name);
+        }
+        int i = 0;
+        while (used.contains("" + i)) i++;
+        return "" + i;
+    }
+
     class InputListener implements MouseListener, MouseMotionListener {
 
         @Override
@@ -300,7 +311,8 @@ public class Canvas {
             if (selectedWindow == 0) {
                 switch (selectedTool) {
                     case 1: {
-                        Vertex v = new Vertex("" + vertexList.size(), e.getX(), e.getY());
+                        String name = nextAvailableVertexName();
+                        Vertex v = new Vertex(name, e.getX(), e.getY());
                         vertexList.add(v);
                         v.draw(graphic);
                         markGraphDirty();
@@ -445,7 +457,6 @@ public class Canvas {
                         break;
                     }
                     case 8: {
-                        // Mark as Root tool
                         Vertex target = null;
                         for (Vertex v : vertexList) {
                             if (v.hasIntersection(e.getX(), e.getY())) {
@@ -453,13 +464,11 @@ public class Canvas {
                                 break;
                             }
                         }
-                        if (target == null) break;   // clicked empty space
+                        if (target == null) break;
 
                         if (target.isRoot) {
                             target.isRoot = false;
                         } else {
-                            // Clear any root in the same connected component,
-                            // then make this vertex the root of that component.
                             Set<Vertex> component = connectedComponentOf(target);
                             for (Vertex v : component) {
                                 v.isRoot = false;
@@ -541,19 +550,33 @@ public class Canvas {
                         Vertex parentV = vertexList.get(clickedVertexIndex);
                         boolean addedAny = false;
                         for (Vertex v : vertexList) {
-                            if (v.hasIntersection(e.getX(), e.getY())
-                                    && v != parentV
-                                    && !v.connectedToVertex(parentV)) {
-                                Edge edge = new Edge(v, parentV, false);
-                                v.addUndirectedNeighbor(parentV);
-                                parentV.addUndirectedNeighbor(v);
+                            if (!v.hasIntersection(e.getX(), e.getY())) {
                                 v.wasClicked = false;
-                                parentV.wasClicked = false;
-                                edgeList.add(edge);
-                                addedAny = true;
-                            } else {
-                                v.wasClicked = false;
+                                continue;
                             }
+
+                            boolean sameVertex = (v == parentV);
+
+                            // For a self-loop, allow only one. For a normal edge,
+                            // block if already connected in any direction.
+                            boolean alreadyThere = sameVertex
+                                    ? parentV.undirectedNeighbors.contains(parentV)
+                                    : v.connectedToVertex(parentV);
+
+                            if (alreadyThere) {
+                                v.wasClicked = false;
+                                continue;
+                            }
+
+                            Edge edge = new Edge(v, parentV, false);
+                            v.addUndirectedNeighbor(parentV);
+                            if (v != parentV) {
+                                parentV.addUndirectedNeighbor(v);
+                            }
+                            v.wasClicked = false;
+                            parentV.wasClicked = false;
+                            edgeList.add(edge);
+                            addedAny = true;
                         }
                         if (addedAny) markGraphDirty();
                         break;
@@ -562,21 +585,25 @@ public class Canvas {
                         Vertex parentV = vertexList.get(clickedVertexIndex);
                         boolean addedAny = false;
                         for (Vertex v : vertexList) {
-                            boolean sameVertex   = (v == parentV);
-                            boolean alreadyThere = parentV.outNeighbors.contains(v);
-                            if (v.hasIntersection(e.getX(), e.getY())
-                                    && !sameVertex
-                                    && !alreadyThere) {
-                                Edge edge = new Edge(parentV, v, true);
-                                parentV.outNeighbors.add(v);
-                                v.inNeighbors.add(parentV);
-                                parentV.wasClicked = false;
+                            if (!v.hasIntersection(e.getX(), e.getY())) {
                                 v.wasClicked = false;
-                                edgeList.add(edge);
-                                addedAny = true;
-                            } else {
-                                v.wasClicked = false;
+                                continue;
                             }
+
+                            boolean alreadyThere = parentV.outNeighbors.contains(v);
+
+                            if (alreadyThere) {
+                                v.wasClicked = false;
+                                continue;
+                            }
+
+                            Edge edge = new Edge(parentV, v, true);
+                            parentV.outNeighbors.add(v);
+                            v.inNeighbors.add(parentV);
+                            parentV.wasClicked = false;
+                            v.wasClicked = false;
+                            edgeList.add(edge);
+                            addedAny = true;
                         }
                         if (addedAny) markGraphDirty();
                         break;
