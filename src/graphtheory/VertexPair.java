@@ -8,10 +8,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Queue;
+import java.util.PriorityQueue;
 import java.util.Vector;
 
 /**
@@ -23,57 +22,87 @@ public class VertexPair {
     public Vertex vertex1;
     public Vertex vertex2;
     public Vector<Vector<Vertex>> pathList;     //all paths
-    public Vector<Vector<Vector<Vertex>>> VertexDisjointContainer = new Vector<Vector<Vector<Vertex>>>(); // container of vertex-disjoint sets
+    public Vector<Vector<Vector<Vertex>>> VertexDisjointContainer =
+            new Vector<Vector<Vector<Vertex>>>();
 
     public VertexPair(Vertex v1, Vertex v2) {
         vertex1 = v1;
         vertex2 = v2;
     }
 
-
+    /**
+     * Weighted shortest distance using Dijkstra.
+     * Returns -1 if unreachable. If all weights are 1, this equals the
+     * BFS hop count.
+     */
     public int getShortestDistance() {
-        Vector<Vertex> visitedNodes = new Vector<Vertex>();
-        visitedNodes.add(vertex1);
+        if (vertex1 == vertex2) return 0;
 
-        int counter = 0;
-        while (!visitedNodes.contains(vertex2)) {
-            int workingSize = visitedNodes.size();
-            for (int i = counter; i < workingSize; i++) {
-                Vertex cur = visitedNodes.get(i);
-                for (Vertex x : cur.undirectedNeighbors) {
-                    if (!visitedNodes.contains(x)) visitedNodes.add(x);
-                }
-                for (Vertex x : cur.outNeighbors) {
-                    if (!visitedNodes.contains(x)) visitedNodes.add(x);
+        final Map<Vertex, Integer> dist = new HashMap<Vertex, Integer>();
+        PriorityQueue<Vertex> pq = new PriorityQueue<Vertex>(11,
+                (a, b) -> Integer.compare(
+                        dist.getOrDefault(a, Integer.MAX_VALUE),
+                        dist.getOrDefault(b, Integer.MAX_VALUE)));
+
+        dist.put(vertex1, 0);
+        pq.add(vertex1);
+
+        while (!pq.isEmpty()) {
+            Vertex u = pq.poll();
+            if (u == vertex2) return dist.get(u);
+            int du = dist.get(u);
+
+            for (Vertex v : allNeighbors(u)) {
+                int w = EdgeRegistry.weightOf(u, v);
+                if (w < 0) continue;                       // no edge in this direction
+                int nd = du + w;
+                if (nd < dist.getOrDefault(v, Integer.MAX_VALUE)) {
+                    dist.put(v, nd);
+                    pq.add(v);
                 }
             }
-            counter++;
-            if (workingSize == visitedNodes.size()) return -1;
         }
-        return counter;
+        return -1;
     }
 
-    /** Returns the actual vertex sequence of the shortest (geodesic) path, or null if unreachable. */
+    /**
+     * Weighted geodesic path via Dijkstra with parent pointers.
+     * Returns null if unreachable.
+     */
     public Vector<Vertex> getShortestPath() {
         if (vertex1 == vertex2) {
             Vector<Vertex> p = new Vector<Vertex>();
             p.add(vertex1);
             return p;
         }
+
+        final Map<Vertex, Integer> dist = new HashMap<Vertex, Integer>();
         Map<Vertex, Vertex> parent = new HashMap<Vertex, Vertex>();
-        Queue<Vertex> queue = new LinkedList<Vertex>();
-        queue.add(vertex1);
-        parent.put(vertex1, null);
-        while (!queue.isEmpty()) {
-            Vertex cur = queue.poll();
-            if (cur == vertex2) break;
-            for (Vertex n : cur.undirectedNeighbors) {
-                if (!parent.containsKey(n)) { parent.put(n, cur); queue.add(n); }
-            }
-            for (Vertex n : cur.outNeighbors) {
-                if (!parent.containsKey(n)) { parent.put(n, cur); queue.add(n); }
+        PriorityQueue<Vertex> pq = new PriorityQueue<Vertex>(11,
+                (a, b) -> Integer.compare(
+                        dist.getOrDefault(a, Integer.MAX_VALUE),
+                        dist.getOrDefault(b, Integer.MAX_VALUE)));
+
+        dist.put(vertex1, 0);
+        pq.add(vertex1);
+
+        while (!pq.isEmpty()) {
+            Vertex u = pq.poll();
+            if (u == vertex2) break;
+            int du = dist.get(u);
+
+            for (Vertex v : allNeighbors(u)) {
+                int w = EdgeRegistry.weightOf(u, v);
+                if (w < 0) continue;
+                int nd = du + w;
+                if (nd < dist.getOrDefault(v, Integer.MAX_VALUE)) {
+                    dist.put(v, nd);
+                    parent.put(v, u);
+                    pq.add(v);
+                }
             }
         }
+
         if (!parent.containsKey(vertex2)) return null;
         Vector<Vertex> path = new Vector<Vertex>();
         for (Vertex cur = vertex2; cur != null; cur = parent.get(cur)) {
@@ -113,6 +142,14 @@ public class VertexPair {
         }
     }
 
+    /** All neighbors of u reachable via one edge (out + undirected). */
+    private List<Vertex> allNeighbors(Vertex u) {
+        List<Vertex> result = new ArrayList<Vertex>();
+        for (Vertex v : u.outNeighbors)        if (!result.contains(v)) result.add(v);
+        for (Vertex v : u.undirectedNeighbors) if (!result.contains(v)) result.add(v);
+        return result;
+    }
+
     public void generateVertexDisjointPaths() {
         VertexDisjointContainer.removeAllElements();
         generatePaths();
@@ -134,40 +171,35 @@ public class VertexPair {
                     }
                 }
             }
-            if(!isAlreadyContained(tempPathList))
-            VertexDisjointContainer.add(tempPathList);
+            if (!isAlreadyContained(tempPathList))
+                VertexDisjointContainer.add(tempPathList);
         }
-        
     }
-    public boolean isAlreadyContained(Vector<Vector<Vertex>> c){
 
-        for(Vector<Vector<Vertex>> d:VertexDisjointContainer){
-                if(d.containsAll(c))
-                    return true;
+    public boolean isAlreadyContained(Vector<Vector<Vertex>> c) {
+        for (Vector<Vector<Vertex>> d : VertexDisjointContainer) {
+            if (d.containsAll(c))
+                return true;
         }
         return false;
     }
-    public boolean areDisjointPaths(Vector<Vertex> path1, Vector<Vertex> path2) {
 
+    public boolean areDisjointPaths(Vector<Vertex> path1, Vector<Vertex> path2) {
         List<Vertex> setA = new ArrayList<Vertex>();
         List<Vertex> setB = new ArrayList<Vertex>();
 
         setA = path1.subList(1, path1.size() - 1);
         setB = path2.subList(1, path2.size() - 1);
         return Collections.disjoint(setA, setB);
-
     }
 
     public void generatePaths() {
         pathList = new Vector<Vector<Vertex>>();
         Vector<Vertex> visitedNodes = new Vector<Vertex>();
 
-        //  System.out.println("Vertex-Disjoint Paths for " + vertex1.name + "-" + vertex2.name);
-
         pathList.removeAllElements();
         visitedNodes.add(vertex1);
         recursePaths(vertex1, visitedNodes);
-
     }
 
     public void recursePaths(Vertex v, Vector<Vertex> visitedNodes) {
@@ -202,10 +234,8 @@ public class VertexPair {
             }
         }
     }
-    // public void
 
     public class Paths {
-
         public Vector<Vertex> Path = new Vector<Vertex>();
     }
 }

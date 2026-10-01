@@ -13,6 +13,9 @@ import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
 import java.awt.Toolkit;
 import java.awt.event.KeyEvent;
+import java.util.ArrayDeque;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.Vector;
 
 public class Canvas {
@@ -20,6 +23,8 @@ public class Canvas {
     public JFrame frame;
     private JMenuBar menuBar;
     private CanvasPane canvas;
+    private JScrollPane propertiesScroll;
+    private JPanel propertiesContent;
     private Graphics2D graphic;
     private Color backgroundColour;
     private Image canvasImage,  canvasImage2;
@@ -109,17 +114,36 @@ public class Canvas {
         item.addActionListener(new MenuListener());
         menuOptions.add(item);
         item = new JMenuItem("Build Walk");
+        item.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_L, KeyEvent.CTRL_DOWN_MASK));
+        item.addActionListener(new MenuListener());
+        menuOptions.add(item);
+        item = new JMenuItem("Set Edge Weight");
         item.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_W, KeyEvent.CTRL_DOWN_MASK));
         item.addActionListener(new MenuListener());
         menuOptions.add(item);
         item = new JMenuItem("Auto Arrange Vertices");
         item.addActionListener(new MenuListener());
-
         menuOptions2.add(item);
+
+        item = new JMenuItem("Show Induced Subgraph");
+        item.addActionListener(new MenuListener());
+        menuOptions2.add(item);
+
+        item = new JMenuItem("Show Greedy Coloring");
+        item.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_C, KeyEvent.CTRL_DOWN_MASK));
+        item.addActionListener(new MenuListener());
+        menuOptions2.add(item);
+
+        item = new JMenuItem("Clear Coloring");
+        item.addActionListener(new MenuListener());
+        menuOptions2.add(item);
+
         item = new JMenuItem("Remove All");
         item.addActionListener(new MenuListener());
         menuOptions2.add(item);
+
         item = new JMenuItem("Mark as Root");
+        item.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_T, KeyEvent.CTRL_DOWN_MASK));
         item.addActionListener(new MenuListener());
         menuOptions2.add(item);
         menuOptions2.addSeparator();
@@ -153,6 +177,86 @@ public class Canvas {
 
         vertexList = new Vector<Vertex>();
         edgeList = new Vector<Edge>();
+
+        buildPropertiesPanel();
+    }
+
+    private void buildPropertiesPanel() {
+        propertiesContent = new JPanel() {
+            @Override
+            public void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                Graphics2D g2 = (Graphics2D) g;
+
+                int w = getWidth();
+                int h = getHeight();
+                g2.setColor(Color.WHITE);
+                g2.fillRect(0, 0, w, h);
+
+                g2.drawImage(canvasImage.getScaledInstance(width / 2, height / 2, Image.SCALE_SMOOTH),
+                             10, 10, null);
+                g2.setColor(Color.BLACK);
+                g2.draw3DRect(10, 10, width / 2, height / 2, true);
+
+                int rightX = width / 2 + 60;
+                int adjY = 50;
+                gP.drawAdjacencyMatrix(g2, vertexList, rightX, adjY);
+                int adjHeight = (vertexList.size() + 1) * 20 + 30;
+
+                int distY = adjY + adjHeight + 20;
+                gP.drawDistanceMatrix(g2, vertexList, rightX, distY);
+                int distHeight = (vertexList.size() + 1) * 20 + 30;
+
+                int summaryY = distY + distHeight + 20;
+                int summaryHeight = gP.drawGraphSummary(g2, vertexList, edgeList, rightX, summaryY);
+
+                int nodeY = height / 2 + 90;
+                gP.drawNodePropertiesTable(g2, vertexList, 10, nodeY);
+                int nodeTableHeight = (vertexList.size() + 2) * 18 + 10;
+
+                int listY = nodeY + nodeTableHeight + 20;
+                gP.drawAdjacencyList(g2, vertexList, 10, listY);
+
+                int captionY = Math.max(
+                        nodeY + (vertexList.size() + 2) * 18 + 40,
+                        summaryY + summaryHeight + 40);
+                captionY = Math.max(captionY, h - 40);
+
+                g2.setColor(Color.BLACK);
+                g2.setFont(g2.getFont().deriveFont(20f));
+            }
+        };
+        propertiesContent.setBackground(Color.WHITE);
+
+        propertiesScroll = new JScrollPane(propertiesContent);
+        propertiesScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+        propertiesScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        propertiesScroll.getVerticalScrollBar().setUnitIncrement(16);
+    }
+
+    private void refreshPropertiesScrollSize() {
+        if (propertiesContent == null) return;
+
+        int matrixRows = vertexList.size() + 1;
+        int matrixHeight = matrixRows * 20 + 30;
+
+        int rightHeight = 50
+                + matrixHeight + 20
+                + matrixHeight + 20
+                + 34 * 16 + 20;
+        int leftHeight = 10
+                       + height / 2 + 20
+                       + (vertexList.size() + 2) * 18 + 30
+                       + (vertexList.size() + 1) * 18 + 20
+                       + 80;
+
+        int neededHeight = Math.max(rightHeight, leftHeight) + 60;
+        neededHeight = Math.max(neededHeight, height);
+        int neededWidth = Math.max(width + 40, width / 2 + 60 + 700);
+
+        propertiesContent.setPreferredSize(new Dimension(neededWidth, neededHeight));
+        propertiesContent.revalidate();
+        propertiesContent.repaint();
     }
 
     private void updateHover(int mx, int my) {
@@ -198,6 +302,7 @@ public class Canvas {
         if (vertexList.size() > 0) {
             gP.computeCutpoints(vertexList);
             gP.computeBridges(vertexList, edgeList);
+            gP.computeBlocks(vertexList, edgeList);
         } else {
             for (Vertex v : vertexList) v.isCutpoint = false;
             for (Edge e : edgeList)   e.isBridge   = false;
@@ -228,14 +333,14 @@ public class Canvas {
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_BACK_SPACE, 0), "walkUndo");
         am.put("walkUndo", new AbstractAction() {
             public void actionPerformed(ActionEvent e) {
-                if (selectedTool == 7 && selectedWindow == 0) { undoWalkStep(); refresh(); }
+                if (selectedTool == 9 && selectedWindow == 0) { undoWalkStep(); refresh(); }
             }
         });
 
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "walkClear");
         am.put("walkClear", new AbstractAction() {
             public void actionPerformed(ActionEvent e) {
-                if (selectedTool == 7 && selectedWindow == 0) { clearWalk(); refresh(); }
+                if (selectedTool == 9 && selectedWindow == 0) { clearWalk(); refresh(); }
             }
         });
 
@@ -268,7 +373,7 @@ public class Canvas {
         if (currentWalk != null && !currentWalk.undo()) currentWalk = null;
     }
 
-    /** Tool 7 left-click: start the walk, or extend it by the clicked vertex or edge. */
+    /** Tool 9 left-click: start the walk, or extend it by the clicked vertex or edge. */
     private void handleWalkClick(int x, int y) {
         Vertex hitV = null;
         for (Vertex v : vertexList) {
@@ -320,7 +425,7 @@ public class Canvas {
      * loads the walk found, or says none exists. kind is e.g. "Euler Tour".
      */
     private void findTraversal(String kind) {
-        selectedTool = 7;
+        selectedTool = 9;
         selectedWindow = 0;
         clearWalk();
         if (kind.startsWith("Hamiltonian") && Traversals.hamiltonTooLarge(vertexList)) {
@@ -347,6 +452,122 @@ public class Canvas {
         return b ? "yes" : "no";
     }
 
+    private Set<Vertex> connectedComponentOf(Vertex start) {
+        Set<Vertex> visited = new HashSet<Vertex>();
+        ArrayDeque<Vertex> queue = new ArrayDeque<Vertex>();
+        visited.add(start);
+        queue.add(start);
+        while (!queue.isEmpty()) {
+            Vertex u = queue.poll();
+            for (Vertex n : u.undirectedNeighbors) if (visited.add(n)) queue.add(n);
+            for (Vertex n : u.outNeighbors)        if (visited.add(n)) queue.add(n);
+            for (Vertex n : u.inNeighbors)         if (visited.add(n)) queue.add(n);
+        }
+        return visited;
+    }
+
+    private String nextAvailableVertexName() {
+        Set<String> used = new HashSet<String>();
+        for (Vertex v : vertexList) {
+            used.add(v.name);
+        }
+        int i = 0;
+        while (used.contains("" + i)) i++;
+        return "" + i;
+    }
+
+    private Vector<Vector> buildInducedSubgraph() {
+        Vector<Vertex> selV = new Vector<Vertex>();
+        for (Vertex v : vertexList) {
+            if (v.wasClicked) selV.add(v);
+        }
+        if (selV.isEmpty()) return null;
+
+        Vector<Edge> selE = new Vector<Edge>();
+        for (Edge e : edgeList) {
+            if (selV.contains(e.vertex1) && selV.contains(e.vertex2)) {
+                selE.add(e);
+            }
+        }
+
+        Vector<Vector> result = new Vector<Vector>();
+        result.add(selV);
+        result.add(selE);
+        return result;
+    }
+
+    private void showSubgraphWindow(Vector<Vector> sub) {
+        Vector<Vertex> sV = sub.firstElement();
+        Vector<Edge> sE = sub.lastElement();
+
+        JFrame w = new JFrame("Induced Subgraph (" + sV.size() + " vertices, "
+                              + sE.size() + " edges)");
+        w.setSize(500, 500);
+
+        JPanel p = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                Graphics2D g2 = (Graphics2D) g;
+
+                g2.setColor(Color.WHITE);
+                g2.fillRect(0, 0, getWidth(), getHeight());
+
+                if (sV.isEmpty()) return;
+
+                int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE;
+                int maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE;
+                for (Vertex v : sV) {
+                    minX = Math.min(minX, v.location.x);
+                    minY = Math.min(minY, v.location.y);
+                    maxX = Math.max(maxX, v.location.x);
+                    maxY = Math.max(maxY, v.location.y);
+                }
+                int margin = 50;
+                int srcW = Math.max(1, maxX - minX);
+                int srcH = Math.max(1, maxY - minY);
+                double scale = Math.min(
+                        (getWidth()  - 2 * margin) / (double) srcW,
+                        (getHeight() - 2 * margin) / (double) srcH);
+                if (scale > 1.0) scale = 1.0;
+
+                g2.setColor(Color.BLACK);
+                for (Edge e : sE) {
+                    int x1 = (int) ((e.vertex1.location.x - minX) * scale) + margin;
+                    int y1 = (int) ((e.vertex1.location.y - minY) * scale) + margin;
+                    int x2 = (int) ((e.vertex2.location.x - minX) * scale) + margin;
+                    int y2 = (int) ((e.vertex2.location.y - minY) * scale) + margin;
+                    g2.drawLine(x1, y1, x2, y2);
+
+                    int mx = (x1 + x2) / 2;
+                    int my = (y1 + y2) / 2;
+                    g2.setColor(new Color(80, 80, 80));
+                    g2.drawString("" + e.weight, mx + 4, my - 4);
+                    g2.setColor(Color.BLACK);
+                }
+
+                int r = 30;
+                for (Vertex v : sV) {
+                    int cx = (int) ((v.location.x - minX) * scale) + margin;
+                    int cy = (int) ((v.location.y - minY) * scale) + margin;
+
+                    g2.setColor(Color.BLACK);
+                    g2.fillOval(cx - r / 2, cy - r / 2, r, r);
+                    g2.setColor(Color.WHITE);
+                    g2.fillOval(cx - r / 2 + 5, cy - r / 2 + 5, r - 10, r - 10);
+
+                    g2.setColor(Color.BLACK);
+                    FontMetrics fm = g2.getFontMetrics();
+                    int tw = fm.stringWidth(v.name);
+                    g2.drawString(v.name, cx - tw / 2, cy + 5);
+                }
+            }
+        };
+
+        w.setContentPane(p);
+        w.setVisible(true);
+    }
+
     class InputListener implements MouseListener, MouseMotionListener {
 
         @Override
@@ -354,7 +575,8 @@ public class Canvas {
             if (selectedWindow == 0) {
                 switch (selectedTool) {
                     case 1: {
-                        Vertex v = new Vertex("" + vertexList.size(), e.getX(), e.getY());
+                        String name = nextAvailableVertexName();
+                        Vertex v = new Vertex(name, e.getX(), e.getY());
                         vertexList.add(v);
                         v.draw(graphic);
                         markGraphDirty();
@@ -362,7 +584,7 @@ public class Canvas {
                         refresh();
                         break;
                     }
-                    case 7: {
+                    case 9: {
                         if (SwingUtilities.isRightMouseButton(e)) {
                             undoWalkStep();
                         } else if (SwingUtilities.isLeftMouseButton(e)) {
@@ -471,6 +693,69 @@ public class Canvas {
                         }
                         break;
                     }
+                    case 7: {
+                        Edge target = null;
+                        for (Edge ed : edgeList) {
+                            if (ed.hasIntersection(e.getX(), e.getY())) {
+                                target = ed;
+                                break;
+                            }
+                        }
+                        if (target == null) break;
+
+                        String input = JOptionPane.showInputDialog(
+                                frame,
+                                "Edge " + target.vertex1.name + " \u2192 " + target.vertex2.name
+                                     + (target.directed ? " (directed)" : " (undirected)")
+                                     + "\nEnter new weight (non-negative integer):",
+                                "" + target.weight);
+
+                        if (input != null) {
+                            try {
+                                int w = Integer.parseInt(input.trim());
+                                if (w < 0) {
+                                    JOptionPane.showMessageDialog(frame,
+                                            "Dijkstra requires non-negative weights.",
+                                            "Invalid weight",
+                                            JOptionPane.WARNING_MESSAGE);
+                                    break;
+                                }
+                                target.setWeight(w);
+                                markGraphDirty();
+                                refresh();
+                            } catch (NumberFormatException ex) {
+                                JOptionPane.showMessageDialog(frame,
+                                        "Please enter a whole number.",
+                                        "Invalid weight",
+                                        JOptionPane.WARNING_MESSAGE);
+                            }
+                        }
+                        break;
+                    }
+                    case 8: {
+                        Vertex target = null;
+                        for (Vertex v : vertexList) {
+                            if (v.hasIntersection(e.getX(), e.getY())) {
+                                target = v;
+                                break;
+                            }
+                        }
+                        if (target == null) break;
+
+                        if (target.isRoot) {
+                            target.isRoot = false;
+                        } else {
+                            Set<Vertex> component = connectedComponentOf(target);
+                            for (Vertex v : component) {
+                                v.isRoot = false;
+                            }
+                            target.isRoot = true;
+                        }
+
+                        updateHover(e.getX(), e.getY());
+                        refresh();
+                        break;
+                    }
                 }
             }
         }
@@ -506,23 +791,16 @@ public class Canvas {
                         break;
                     }
                     case 3: {
-                        for (Vertex v : vertexList) {
-                            v.wasClicked = false;
-                        }
-
-                        for (Edge d : edgeList) {
-                            if (d.hasIntersection(e.getX(), e.getY())) {
-                                d.wasClicked = true;
-                                clickedEdgeIndex = edgeList.indexOf(d);
-                            } else {
-                                d.wasClicked = false;
-                            }
-                        }
+                        boolean hitAny = false;
                         for (Vertex v : vertexList) {
                             if (v.hasIntersection(e.getX(), e.getY())) {
-                                v.wasClicked = true;
+                                v.wasClicked = !v.wasClicked;
                                 clickedVertexIndex = vertexList.indexOf(v);
+                                hitAny = true;
                             }
+                        }
+                        if (!hitAny) {
+                            for (Vertex v : vertexList) v.wasClicked = false;
                         }
 
                         updateHover(e.getX(), e.getY());
@@ -541,19 +819,31 @@ public class Canvas {
                         Vertex parentV = vertexList.get(clickedVertexIndex);
                         boolean addedAny = false;
                         for (Vertex v : vertexList) {
-                            if (v.hasIntersection(e.getX(), e.getY()) && !v.connectedToVertex(parentV)) {
-                                Edge edge = new Edge(v, parentV, false);
-                                v.addUndirectedNeighbor(parentV);
-                                if (v != parentV) {
-                                    parentV.addUndirectedNeighbor(v);
-                                }
+                            if (!v.hasIntersection(e.getX(), e.getY())) {
                                 v.wasClicked = false;
-                                parentV.wasClicked = false;
-                                edgeList.add(edge);
-                                addedAny = true;
-                            } else {
-                                v.wasClicked = false;
+                                continue;
                             }
+
+                            boolean sameVertex = (v == parentV);
+
+                            boolean alreadyThere = sameVertex
+                                    ? parentV.undirectedNeighbors.contains(parentV)
+                                    : v.connectedToVertex(parentV);
+
+                            if (alreadyThere) {
+                                v.wasClicked = false;
+                                continue;
+                            }
+
+                            Edge edge = new Edge(v, parentV, false);
+                            v.addUndirectedNeighbor(parentV);
+                            if (v != parentV) {
+                                parentV.addUndirectedNeighbor(v);
+                            }
+                            v.wasClicked = false;
+                            parentV.wasClicked = false;
+                            edgeList.add(edge);
+                            addedAny = true;
                         }
                         if (addedAny) markGraphDirty();
                         break;
@@ -562,18 +852,25 @@ public class Canvas {
                         Vertex parentV = vertexList.get(clickedVertexIndex);
                         boolean addedAny = false;
                         for (Vertex v : vertexList) {
-                            boolean alreadyThere = parentV.outNeighbors.contains(v);
-                            if (v.hasIntersection(e.getX(), e.getY()) && !alreadyThere) {
-                                Edge edge = new Edge(parentV, v, true);
-                                parentV.outNeighbors.add(v);
-                                v.inNeighbors.add(parentV);
-                                parentV.wasClicked = false;
+                            if (!v.hasIntersection(e.getX(), e.getY())) {
                                 v.wasClicked = false;
-                                edgeList.add(edge);
-                                addedAny = true;
-                            } else {
-                                v.wasClicked = false;
+                                continue;
                             }
+
+                            boolean alreadyThere = parentV.outNeighbors.contains(v);
+
+                            if (alreadyThere) {
+                                v.wasClicked = false;
+                                continue;
+                            }
+
+                            Edge edge = new Edge(parentV, v, true);
+                            parentV.outNeighbors.add(v);
+                            v.inNeighbors.add(parentV);
+                            parentV.wasClicked = false;
+                            v.wasClicked = false;
+                            edgeList.add(edge);
+                            addedAny = true;
                         }
                         if (addedAny) markGraphDirty();
                         break;
@@ -648,18 +945,32 @@ public class Canvas {
                 currentPairVP = null;
                 pairPaths = null;
             } else if (command.equals("Build Walk")) {
-                selectedTool = 7;
+                selectedTool = 9;
                 clearWalk();
             } else if (command.startsWith("Find ")) {
                 findTraversal(command.substring("Find ".length()));
+            } else if (command.equals("Set Edge Weight")) {
+                selectedTool = 7;
             } else if (command.equals("Mark as Root")) {
-                for (Vertex v : vertexList) {
-                    if (v.wasClicked) {
-                        v.isRoot = !v.isRoot;
-                    }
-                }
+                selectedTool = 8;
             } else if (command.equals("Auto Arrange Vertices")) {
                 arrangeVertices();
+            } else if (command.equals("Show Induced Subgraph")) {
+                Vector<Vector> sub = buildInducedSubgraph();
+                if (sub == null) {
+                    JOptionPane.showMessageDialog(frame,
+                            "Select at least one vertex (Grab Tool) before showing the subgraph.",
+                            "No selection",
+                            JOptionPane.INFORMATION_MESSAGE);
+                } else {
+                    showSubgraphWindow(sub);
+                }
+            } else if (command.equals("Show Greedy Coloring")) {
+                gP.greedyColoring(vertexList);
+                refresh();
+            } else if (command.equals("Clear Coloring")) {
+                gP.clearColoring(vertexList);
+                refresh();
             } else if (command.equals("Remove All")) {
                 edgeList.removeAllElements();
                 vertexList.removeAllElements();
@@ -680,29 +991,45 @@ public class Canvas {
                     loadFile(fileManager.loadFile(fileManager.jF.getSelectedFile()));
                     System.out.println(fileManager.jF.getSelectedFile());
                     selectedWindow = 0;
+                    frame.setContentPane(canvas);
+                    frame.revalidate();
+                    frame.repaint();
                 }
             } else if (command.equals("Save to File")) {
                 int returnValue = fileManager.jF.showSaveDialog(frame);
                 if (returnValue == JFileChooser.APPROVE_OPTION) {
-                    fileManager.saveFile(vertexList, fileManager.jF.getSelectedFile());
+                    fileManager.saveFile(vertexList, edgeList, fileManager.jF.getSelectedFile());
                     System.out.println(fileManager.jF.getSelectedFile());
                 }
             } else if (command.equals("Graph")) {
                 selectedWindow = 0;
+                frame.setContentPane(canvas);
+                frame.revalidate();
+                frame.repaint();
             } else if (command.equals("Properties")) {
                 selectedWindow = 1;
                 if (vertexList.size() > 0) {
                     int[][] matrix = gP.generateAdjacencyMatrix(vertexList, edgeList);
 
-                    Vector<Vertex> tempList = gP.vertexConnectivity(vertexList);
-                    for (Vertex v : tempList) {
-                        vertexList.get(vertexList.indexOf(v)).wasClicked = true;
-                    }
+                    gP.vertexConnectivity(vertexList);
+                    gP.edgeConnectivity(vertexList, edgeList);
+
+                    for (Vertex v : vertexList) v.wasClicked = false;
+                    for (Edge ed : edgeList)    ed.wasClicked = false;
+
+                    for (Vertex v : gP.witnessVertices) v.wasClicked = true;
+                    for (Edge ed : gP.witnessEdges)     ed.wasClicked = true;
+
                     reloadVertexConnections(matrix, vertexList);
 
                     gP.generateDistanceMatrix(vertexList);
                     gP.displayContainers(vertexList);
                 }
+
+                refreshPropertiesScrollSize();
+                frame.setContentPane(propertiesScroll);
+                frame.revalidate();
+                frame.repaint();
             }
 
             refresh();
@@ -751,6 +1078,7 @@ public class Canvas {
 
     public void refresh() {
         recomputeGraphProperties();
+        EdgeRegistry.rebuild(edgeList);
         applyHighlights();
         erase();
         for (Edge e : edgeList) {
@@ -761,6 +1089,9 @@ public class Canvas {
         }
         drawWalkMarkers(graphic);
         canvas.repaint();
+        if (propertiesContent != null) {
+            propertiesContent.repaint();
+        }
     }
 
     /** Pushes the walk highlight and step labels onto the edges before drawing. */
@@ -842,19 +1173,25 @@ public class Canvas {
 
     private void drawInfoBox(Graphics g) {
         Vertex clicked = null;
+        int selCount = 0;
         for (Vertex v : vertexList) {
-            if (v.wasClicked) { clicked = v; break; }
+            if (v.wasClicked) {
+                selCount++;
+                if (clicked == null) clicked = v;
+            }
         }
         if (clicked == null) return;
 
-        int x = 10, y = 10, w = 170, h = 142;
+        int x = 10, y = 10, w = 190, h = 158;
         g.setColor(new Color(245, 245, 245));
         g.fillRect(x, y, w, h);
         g.setColor(Color.BLACK);
         g.drawRect(x, y, w, h);
 
         int ty = y + 16;
-        g.drawString("Vertex: " + clicked.name,             x + 6, ty); ty += 16;
+        g.drawString("Selected: " + selCount + " vertex" + (selCount == 1 ? "" : "es"),
+                     x + 6, ty); ty += 16;
+        g.drawString("First: " + clicked.name,              x + 6, ty); ty += 16;
         g.drawString("Degree: " + clicked.degree(),         x + 6, ty); ty += 16;
         g.drawString("In-Degree: " + clicked.inDegree(),    x + 6, ty); ty += 16;
         g.drawString("Out-Degree: " + clicked.outDegree(),  x + 6, ty); ty += 16;
@@ -903,7 +1240,7 @@ public class Canvas {
         int pathCount = pairPaths != null ? pairPaths.size() : 0;
         int rows = Math.min(PATH_ROWS, pathCount);
 
-        int x = 190, y = 10, w = 430;
+        int x = 210, y = 10, w = 430;
         int h = 15 * (7 + Math.max(rows, 1)) + 8;
         g.setColor(new Color(240, 248, 255));
         g.fillRect(x, y, w, h);
@@ -915,7 +1252,7 @@ public class Canvas {
         g.drawString("Ordered pair: (" + pairLabel + ")",          lx, ty); ty += 15;
         g.drawString("Adjacent: " + adjacent,                      lx, ty); ty += 15;
         g.drawString("Reachable: " + reachable,                    lx, ty); ty += 15;
-        g.drawString("Distance: " + (reachable ? dist : "\u221E"), lx, ty); ty += 15;
+        g.drawString("Geodesic dist (weighted): " + (reachable ? dist : "\u221E"), lx, ty); ty += 15;
         if (!geodesicStr.isEmpty()) {
             g.drawString("Geodesic path: " + geodesicStr,          lx, ty); ty += 15;
         } else {
@@ -982,9 +1319,23 @@ public class Canvas {
         public void paint(Graphics g) {
             switch (selectedWindow) {
                 case 0: {
-                    graphic.drawString("Vertex Count=" + vertexList.size() +
-                            "  Edge Count=" + edgeList.size() +
-                            "  Selected Tool=" + selectedTool, 50, height / 2 + (height * 2) / 5);
+                    String toolName;
+                    switch (selectedTool) {
+                        case 1: toolName = "Add Vertex"; break;
+                        case 2: toolName = "Add Edges"; break;
+                        case 3: toolName = "Grab Tool"; break;
+                        case 4: toolName = "Remove Tool"; break;
+                        case 5: toolName = "Add Directed Edge"; break;
+                        case 6: toolName = "Select Pair"; break;
+                        case 7: toolName = "Set Edge Weight"; break;
+                        case 8: toolName = "Mark as Root"; break;
+                        case 9: toolName = "Build Walk"; break;
+                        default: toolName = "None"; break;
+                    }
+                    graphic.drawString("Vertex Count=" + vertexList.size()
+                            + "  Edge Count=" + edgeList.size()
+                            + "  Selected Tool=" + toolName,
+                            50, height / 2 + (height * 2) / 5);
                     g.drawImage(canvasImage, 0, 0, null);
                     drawInfoBox(g);
                     drawPairInfoBox(g);
@@ -993,35 +1344,8 @@ public class Canvas {
                     break;
                 }
                 case 1: {
-    Graphics g2 = canvasImage2.getGraphics();
-    g2.clearRect(0, 0, width, height);
-
-    // ---- Right column: two matrices + summary ----
-    int rightX = width / 2 + 60;
-    int adjY = 50;
-    gP.drawAdjacencyMatrix(g2, vertexList, rightX, adjY);
-    int adjHeight = (vertexList.size() + 1) * 20 + 30;
-
-    int distY = adjY + adjHeight + 20;
-    gP.drawDistanceMatrix(g2, vertexList, rightX, distY);
-    int distHeight = (vertexList.size() + 1) * 20 + 30;
-
-    int summaryY = distY + distHeight + 20;
-    gP.drawGraphSummary(g2, vertexList, edgeList, rightX, summaryY);
-
-    // ---- Left column: node properties ----
-    gP.drawNodePropertiesTable(g2, vertexList, 10, height / 2 + 90);
-
-    // ---- Composite ----
-    g.drawImage(canvasImage2, 0, 0, null);
-    g.drawImage(canvasImage.getScaledInstance(width / 2, height / 2, Image.SCALE_SMOOTH),
-                0, 0, null);
-    g.draw3DRect(0, 0, width / 2, height / 2, true);
-
-    drawString("Graph disconnects when nodes in color red are removed.", 100, height - 30, 20);
-    g.setColor(Color.black);
-    break;
-}
+                    break;
+                }
             }
         }
     }

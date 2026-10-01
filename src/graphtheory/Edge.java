@@ -17,6 +17,9 @@ public class Edge {
     public int weight = 1;
     public boolean isBridge;
 
+    /** Set by GraphProperties.computeBlocks to identify which block this edge belongs to. */
+    public int blockId = -1;
+
     // Set by Canvas when the Remove Tool hovers over this edge.
     public boolean removeHover = false;
 
@@ -37,6 +40,11 @@ public class Edge {
         vertex1 = v1;
         vertex2 = v2;
         this.directed = directed;
+    }
+
+    /** Change this edge's weight. */
+    public void setWeight(int w) {
+        this.weight = w;
     }
 
     public boolean isSelfLoop() {
@@ -110,8 +118,6 @@ public class Edge {
 
         boolean hasReverse = hasReverseArc();
 
-        // Control point: midpoint shifted perpendicular to travel direction
-        // when a reverse arc exists. Zero offset → straight line.
         double mx = (startX + endX) / 2.0;
         double my = (startY + endY) / 2.0;
         double perpX = -(endY - startY);
@@ -134,12 +140,10 @@ public class Edge {
         }
 
         if (directed) {
-            // Arrowhead tangent = end-tangent of the quadratic (P2 - C).
             double endAngle = Math.atan2(endY - ctrlY, endX - ctrlX);
             drawArrowhead(g, endX, endY, endAngle);
         }
 
-        // Weight label: draw at the curve's apex, offset a bit more.
         int midX = (int) ((startX + 2 * ctrlX + endX) / 4.0);
         int midY = (int) ((startY + 2 * ctrlY + endY) / 4.0);
         g.setColor(new Color(80, 80, 80));
@@ -154,7 +158,6 @@ public class Edge {
         g.drawString(stepLabel, x, y);
     }
 
-    /** Draws a quadratic Bezier, falling back to a straight line if flat. */
     private void drawQuadCurve(Graphics g, int x0, int y0, int cx, int cy, int x1, int y1) {
         if (cx == (x0 + x1) / 2 && cy == (y0 + y1) / 2) {
             g.drawLine(x0, y0, x1, y1);
@@ -229,7 +232,6 @@ public class Edge {
         double ctrlX = mx + (perpX / perpLen) * curveOffset;
         double ctrlY = my + (perpY / perpLen) * curveOffset;
 
-        // Walk along the quadratic; minimum distance to (px, py) must be <= TOLERANCE.
         int segments = 24;
         double best = Double.MAX_VALUE;
         for (int i = 0; i <= segments; i++) {
