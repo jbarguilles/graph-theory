@@ -853,6 +853,85 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
+## Task 2b: Bitmask DP Hamiltonian search (replaces the backtracking)
+
+> **Added after review.** Task 2's backtracking was correct: fuzzed against brute force on 200,000 graphs with 0 mismatches. But it explodes well under the 20-vertex cap. K11 + 1 isolated vertex took 73 s for a path, and K7,8 took over 90 s. ADR 0003 is updated.
+
+**Files:** Modify `src/graphtheory/Traversals.java` and `test/graphtheory/TraversalsTest.java`.
+
+**Design:**
+- Keep the public API exactly as it is: `hamiltonTooLarge`, `hamiltonianPath` and `hamiltonianCycle` return a `Walk` or null. Add javadoc to `hamiltonTooLarge` saying the searches return null above the cap.
+- n = 0 → null. **n = 1 and n = 2 keep the current edge-aware logic.** It's simplest to keep `extendHamiltonian` for n ≤ 2 only, which is trivially fast. This covers the self-loop 1-cycle, and the 2-cycle that needs two different edges, e.g. {a,b}+(a,b) has to go out on the arc.
+- n ≥ 3: index the vertices in `vList` 0..n-1. Ignore edge endpoints not in `vList` and self-loops. `out[i]` = bitmask of the vertices j ≠ i reachable from i in one step (`Walk.canTraverse`).
+  - `reach[mask]` = bitmask of the vertices v such that some path visits exactly the set `mask` and ends at v.
+  - **Path:** seed `reach[1<<i] = 1<<i` for every i. Iterate the masks in increasing order. For each v in `reach[mask]` and each w in `out[v] & ~mask`, set bit w in `reach[mask | 1<<w]`. If `reach[full] != 0`, pick the lowest end v. Rebuild the vertices backwards: the previous vertex is any u in `reach[mask ^ (1<<v)]` with bit v in `out[u]`.
+  - **Cycle:** same, but seed only vertex 0. A cycle can be rotated to start at any vertex, so vertex 0 is enough. Success means some v in `reach[full]` with bit 0 in `out[v]`.
+  - **Turn the vertex sequence into a Walk** by choosing, for each step, the first edge from `Walk.edgesBetween(from, to, eList)`. For n ≥ 3 a path or cycle never reuses an edge, so any choice works. Close the cycle the same way.
+  - Memory: `int[1 << n]`, 4 MB at n = 20. Fine.
+- Fixes the review's Minor 3 for free: vertices not in `vList` are never stepped onto.
+
+**Tests** (add; keep all existing ones):
+
+```java
+    private void complete(Vertex[] k) {
+        for (int i = 0; i < k.length; i++)
+            for (int j = i + 1; j < k.length; j++) und(k[i], k[j]);
+    }
+
+    @Test(timeout = 2000)
+    public void k11PlusIsolatedVertex_noHamiltonianPathOrCycle_fast() {
+        Vertex[] k = new Vertex[11];
+        for (int i = 0; i < 11; i++) { k[i] = new Vertex("k" + i, 0, 0); vList.add(k[i]); }
+        complete(k);
+        vList.add(new Vertex("lonely", 0, 0));
+        assertNull(Traversals.hamiltonianPath(vList, eList));
+        assertNull(Traversals.hamiltonianCycle(vList, eList));
+    }
+
+    @Test(timeout = 2000)
+    public void k7_8_hasHamiltonianPath_noCycle_fast() {
+        Vertex[] left = new Vertex[7], right = new Vertex[8];
+        for (int i = 0; i < 7; i++) { left[i] = new Vertex("l" + i, 0, 0); vList.add(left[i]); }
+        for (int i = 0; i < 8; i++) { right[i] = new Vertex("r" + i, 0, 0); vList.add(right[i]); }
+        for (Vertex l : left) for (Vertex r : right) und(l, r);
+        assertHamiltonianPath(Traversals.hamiltonianPath(vList, eList));
+        assertNull(Traversals.hamiltonianCycle(vList, eList));
+    }
+
+    @Test(timeout = 2000)
+    public void k20_hasHamiltonianCycle_atCap_fast() {
+        Vertex[] k = new Vertex[20];
+        for (int i = 0; i < 20; i++) { k[i] = new Vertex("k" + i, 0, 0); vList.add(k[i]); }
+        complete(k);
+        assertHamiltonianCycle(Traversals.hamiltonianCycle(vList, eList));
+    }
+
+    @Test
+    public void directedCycleOfFour_followsArcs() {
+        vertices(a, b, c, d);
+        arc(a, b); arc(b, c); arc(c, d); arc(d, a); arc(a, c);
+        Walk w = Traversals.hamiltonianCycle(vList, eList);
+        assertHamiltonianCycle(w);
+    }
+```
+
+Also add a `for (Vertex v : vList) assertTrue(w.visits(v));` loop to `assertHamiltonianPath`.
+
+**Verification beyond JUnit:** run the reviewer's brute-force harness `HamFuzz.java` (scratchpad `graphtheory\` folder, the same folder as Task 1b's Fuzz.java) against the new code for at least 200,000 graphs; mismatches must be 0. Run `HamPerf.java` on the cases from the review. Use an in-process timeout. **Never run `taskkill` on java.exe**, because it kills the user's other Java programs. Don't commit the harness.
+
+**Expected:** `OK (88 tests)`, i.e. 84 + 4.
+
+**Commit:**
+
+```bash
+git add src/graphtheory/Traversals.java test/graphtheory/TraversalsTest.java
+git commit -m "perf: bitmask DP Hamiltonian search, milliseconds up to the 20-vertex cap
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+---
+
 ## Task 3: Graph Summary uses `Traversals`
 
 **Files:**
@@ -967,7 +1046,7 @@ Expected: no matches.
 - [ ] **Step 5: Compile and run the tests**
 
 Run the build-and-test command.
-Expected: `OK (82 tests)`.
+Expected: `OK (88 tests)`.
 
 - [ ] **Step 6: Commit**
 
@@ -1057,7 +1136,7 @@ Add this method directly after `handleWalkClick`:
 - [ ] **Step 4: Compile and run the tests**
 
 Run the build-and-test command.
-Expected: `OK (82 tests)`.
+Expected: `OK (88 tests)`.
 
 - [ ] **Step 5: Commit**
 
