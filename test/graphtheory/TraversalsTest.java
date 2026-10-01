@@ -148,16 +148,108 @@ public class TraversalsTest {
         assertNull(Traversals.eulerTour(vList, eList));
     }
 
-    @Test
-    public void mixedOverEdgeCap_isTooLarge_butPureUndirectedIsNot() {
-        Vertex[] vs = new Vertex[40];
-        for (int i = 0; i < 40; i++) { vs[i] = new Vertex("v" + i, 0, 0); vList.add(vs[i]); }
-        for (int i = 0; i < 40; i++) und(vs[i], vs[(i + 1) % 40]);   // 40-edge cycle
-        assertFalse(Traversals.eulerTooLarge(eList));
-        assertEulerTrail(Traversals.eulerTour(vList, eList));
-
-        arc(vs[0], vs[1]);
-        assertTrue(Traversals.eulerTooLarge(eList));
+    @Test(timeout = 2000)
+    public void windmillWithTwoTrappingArcs_noEulerTrail_fast() {
+        // 9 triangles sharing hub h, plus arcs h->x twice: every vertex has
+        // even edge-ends, but x can't be left. Backtracking took minutes here.
+        Vertex h = new Vertex("h", 0, 0), x = new Vertex("x", 0, 0);
+        vList.add(h); vList.add(x);
+        for (int i = 0; i < 9; i++) {
+            Vertex p = new Vertex("p" + i, 0, 0), q = new Vertex("q" + i, 0, 0);
+            vList.add(p); vList.add(q);
+            und(h, p); und(p, q); und(q, h);
+        }
+        arc(h, x); arc(h, x);
         assertNull(Traversals.eulerTrail(vList, eList));
+        assertNull(Traversals.eulerTour(vList, eList));
+    }
+
+    @Test(timeout = 2000)
+    public void k7MinusEdgePlusTwoArcs_noEulerTour_fast() {
+        Vertex[] k = new Vertex[7];
+        for (int i = 0; i < 7; i++) { k[i] = new Vertex("k" + i, 0, 0); vList.add(k[i]); }
+        for (int i = 0; i < 7; i++)
+            for (int j = i + 1; j < 7; j++)
+                if (!(i == 0 && j == 1)) und(k[i], k[j]);
+        Vertex x = new Vertex("x", 0, 0);
+        vList.add(x);
+        arc(x, k[0]); arc(x, k[1]);
+        assertNull(Traversals.eulerTour(vList, eList));
+    }
+
+    @Test(timeout = 2000)
+    public void largeMixedCycle_hasEulerTour_noCap() {
+        Vertex[] vs = new Vertex[60];
+        for (int i = 0; i < 60; i++) { vs[i] = new Vertex("v" + i, 0, 0); vList.add(vs[i]); }
+        for (int i = 0; i < 60; i++) {
+            if (i % 2 == 0) arc(vs[i], vs[(i + 1) % 60]); else und(vs[i], vs[(i + 1) % 60]);
+        }
+        Walk w = Traversals.eulerTour(vList, eList);
+        assertEulerTrail(w);
+        assertTrue(w.isCircuit());
+    }
+
+    @Test
+    public void mixedTrail_mustStartAtSecondOddVertex() {
+        // Odd vertices are a (first in vList) and c; the arc forces c -> b -> a.
+        vertices(a, b, c);
+        arc(c, b); und(b, a);
+        Walk w = Traversals.eulerTrail(vList, eList);
+        assertEulerTrail(w);
+        assertSame(c, w.start());
+        assertSame(a, w.end());
+    }
+
+    @Test
+    public void mixedUndirectedEdgesMustBeOrientedConsistently() {
+        // Square with arcs (a,b), (c,d) and undirected {b,c}, {d,a}.
+        // The tour a->b->c->d->a needs {b,c} as b->c and {d,a} as d->a.
+        vertices(a, b, c, d);
+        arc(a, b); und(b, c); arc(c, d); und(d, a);
+        Walk w = Traversals.eulerTour(vList, eList);
+        assertEulerTrail(w);
+        assertTrue(w.isCircuit());
+    }
+
+    @Test
+    public void parallelUndirectedEdges_tourOfLengthTwo() {
+        vertices(a, b);
+        und(a, b); und(a, b);
+        Walk w = Traversals.eulerTour(vList, eList);
+        assertEulerTrail(w);
+        assertTrue(w.isCircuit());
+    }
+
+    @Test
+    public void parallelArcsSameWay_noTour_trailNeedsBalance() {
+        vertices(a, b);
+        arc(a, b); arc(a, b);
+        assertNull(Traversals.eulerTour(vList, eList));
+        assertNull(Traversals.eulerTrail(vList, eList));
+    }
+
+    @Test
+    public void directedSelfLoop_isEulerTourOfLengthOne() {
+        vertices(a);
+        arc(a, a);
+        Walk w = Traversals.eulerTour(vList, eList);
+        assertEulerTrail(w);
+        assertTrue(w.isCircuit());
+    }
+
+    @Test
+    public void balancedDirectedGraph_eulerTrailIsClosed() {
+        vertices(a, b, c);
+        arc(a, b); arc(b, c); arc(c, a);
+        assertTrue(Traversals.eulerTrail(vList, eList).isCircuit());
+    }
+
+    @Test
+    public void mixedWithSelfLoops_hasEulerTour() {
+        vertices(a, b);
+        arc(a, b); und(b, a); und(a, a); arc(b, b);
+        Walk w = Traversals.eulerTour(vList, eList);
+        assertEulerTrail(w);
+        assertTrue(w.isCircuit());
     }
 }
