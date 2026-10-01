@@ -75,7 +75,28 @@ Edge cases:
 
 _Avoid_: "distance" for the length of a particular walk — use **Length**.
 
-_Avoid_: "Tour" for a closed trail — use **Circuit**. "Tour" is reserved for an Euler tour (a closed walk using every edge).
+_Avoid_: "Tour" for a closed trail — use **Circuit**. "Tour" is reserved for an **Euler tour**.
+
+### Euler Trail and Euler Tour
+
+- **Euler trail** — a trail that uses every edge of the graph exactly once.
+- **Euler tour** — an Euler trail that is closed (a circuit using every edge exactly once).
+
+Like any walk, it must respect direction: a directed edge is crossed only from its source to its destination, and an undirected edge may be crossed either way (but still only once). Isolated vertices do not matter; every edge must be reachable from the trail.
+
+In a graph with no edges, the trivial walk is an Euler trail but not an Euler tour (it is not closed). A graph with no vertices has neither.
+
+_Avoid_: "Euler path" — an Euler trail may repeat vertices, so it is generally not a **Path**. "Euler circuit" is an acceptable synonym for Euler tour.
+
+### Hamiltonian Path and Hamiltonian Cycle
+
+- **Hamiltonian path** — a path that visits every vertex of the graph.
+- **Hamiltonian cycle** — a cycle that visits every vertex of the graph.
+
+They follow the walk rules exactly, including direction, so there is no minimum number of vertices:
+- A single vertex with no edges has a Hamiltonian path (the trivial walk) but no Hamiltonian cycle.
+- A single vertex with a self-loop has a Hamiltonian cycle of length 1.
+- Two vertices joined by {a, b} and (b, a) have a Hamiltonian cycle of length 2. Joined by {a, b} alone, they do not.
 
 ---
 
