@@ -2,6 +2,7 @@ package graphtheory;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -69,11 +70,25 @@ public class Traversals {
         return ends;
     }
 
-    /** Vertices with an odd number of edge-ends, in vList order. */
+    /**
+     * vList, followed by any edge endpoints missing from it (in edge order).
+     * Counting every endpoint keeps the degree tests honest; the fixed order
+     * keeps the chosen start deterministic.
+     */
+    private static Set<Vertex> allVertices(Vector<Vertex> vList, Vector<Edge> eList) {
+        Set<Vertex> all = new LinkedHashSet<Vertex>(vList);
+        for (Edge e : eList) {
+            all.add(e.vertex1);
+            all.add(e.vertex2);
+        }
+        return all;
+    }
+
+    /** Vertices with an odd number of edge-ends, in allVertices order. */
     private static List<Vertex> oddVertices(Vector<Vertex> vList, Vector<Edge> eList) {
         Map<Vertex, Integer> ends = endCounts(eList);
         List<Vertex> odd = new Vector<Vertex>();
-        for (Vertex v : vList) {
+        for (Vertex v : allVertices(vList, eList)) {
             if (get(ends, v) % 2 != 0) odd.add(v);
         }
         return odd;
@@ -99,7 +114,7 @@ public class Traversals {
         }
         Vertex plus = null;
         int plusCount = 0, minusCount = 0;
-        for (Vertex v : vList) {
+        for (Vertex v : allVertices(vList, eList)) {
             int n = get(net, v);
             if (n == 0) continue;
             if (n == 1) { plus = v; plusCount++; }
@@ -192,7 +207,7 @@ public class Traversals {
         int cut = es.indexOf(virtual);
         Walk trail = new Walk(tour.vertices().get(cut + 1));
         for (int k = 1; k < es.size(); k++) {
-            trail.extend(es.get((cut + k) % es.size()));
+            if (!trail.extend(es.get((cut + k) % es.size()))) return null;
         }
         return trail;
     }

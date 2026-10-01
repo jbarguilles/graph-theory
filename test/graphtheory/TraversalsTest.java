@@ -245,6 +245,30 @@ public class TraversalsTest {
     }
 
     @Test
+    public void edgeEndpointMissingFromVertexList_stillFindsTrail() {
+        // g is an endpoint of the arc but not in vList; it must still be counted.
+        Vertex g = new Vertex("g", 0, 0);
+        vertices(a);
+        Edge e = arc(a, g);
+        Walk w = Traversals.eulerTrail(vList, eList);
+        assertEulerTrail(w);
+        assertSame(a, w.start());
+        assertSame(g, w.end());
+        assertSame(e, w.edges().get(0));
+    }
+
+    @Test
+    public void mixedOrientation_mustReassignAnEarlierEdge() {
+        // Greedy puts {a,b} on a; {a,c} then forces {a,b} to move to b.
+        // The only tour is a->c->b->a.
+        vertices(a, b, c);
+        und(a, b); und(a, c); arc(c, b);
+        Walk w = Traversals.eulerTour(vList, eList);
+        assertEulerTrail(w);
+        assertTrue(w.isCircuit());
+    }
+
+    @Test
     public void mixedWithSelfLoops_hasEulerTour() {
         vertices(a, b);
         arc(a, b); und(b, a); und(a, a); arc(b, b);
