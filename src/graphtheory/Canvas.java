@@ -178,9 +178,16 @@ public class Canvas {
                 int summaryY = distY + distHeight + 20;
                 int summaryHeight = gP.drawGraphSummary(g2, vertexList, edgeList, rightX, summaryY);
 
+                // Left column below the preview: Node Properties
                 int nodeY = height / 2 + 90;
                 gP.drawNodePropertiesTable(g2, vertexList, 10, nodeY);
+                int nodeTableHeight = (vertexList.size() + 2) * 18 + 10;
 
+                // Adjacency list, stacked below the Node Properties table.
+                int listY = nodeY + nodeTableHeight + 20;
+                gP.drawAdjacencyList(g2, vertexList, 10, listY);
+
+                // Bottom captions
                 int captionY = Math.max(
                         nodeY + (vertexList.size() + 2) * 18 + 40,
                         summaryY + summaryHeight + 40);
@@ -210,7 +217,8 @@ public class Canvas {
                 + 24 * 16 + 20;
         int leftHeight = 10
                        + height / 2 + 20
-                       + (vertexList.size() + 2) * 18 + 30
+                       + (vertexList.size() + 2) * 18 + 30       // node table
+                       + (vertexList.size() + 1) * 18 + 20       // adjacency list
                        + 80;
 
         int neededHeight = Math.max(rightHeight, leftHeight) + 60;
@@ -294,14 +302,6 @@ public class Canvas {
         return "" + i;
     }
 
-    /**
-     * Build the induced subgraph of the currently selected (wasClicked) vertices:
-     *   - keep only those vertices,
-     *   - keep only edges whose BOTH endpoints are in the set.
-     *
-     * Returns a 2-element Vector: [0] = Vector&lt;Vertex&gt;, [1] = Vector&lt;Edge&gt;.
-     * Returns null if fewer than 1 vertex is selected.
-     */
     private Vector<Vector> buildInducedSubgraph() {
         Vector<Vertex> selV = new Vector<Vertex>();
         for (Vertex v : vertexList) {
@@ -322,10 +322,6 @@ public class Canvas {
         return result;
     }
 
-    /**
-     * Opens a read-only window showing the induced subgraph.
-     * Coordinates are scaled so the subgraph fills the window nicely.
-     */
     private void showSubgraphWindow(Vector<Vector> sub) {
         Vector<Vertex> sV = sub.firstElement();
         Vector<Edge> sE = sub.lastElement();
@@ -345,7 +341,6 @@ public class Canvas {
 
                 if (sV.isEmpty()) return;
 
-                // Bounding box of selected vertices
                 int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE;
                 int maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE;
                 for (Vertex v : sV) {
@@ -360,9 +355,8 @@ public class Canvas {
                 double scale = Math.min(
                         (getWidth()  - 2 * margin) / (double) srcW,
                         (getHeight() - 2 * margin) / (double) srcH);
-                if (scale > 1.0) scale = 1.0;   // don't zoom in beyond 1x
+                if (scale > 1.0) scale = 1.0;
 
-                // Draw edges first
                 g2.setColor(Color.BLACK);
                 for (Edge e : sE) {
                     int x1 = (int) ((e.vertex1.location.x - minX) * scale) + margin;
@@ -371,7 +365,6 @@ public class Canvas {
                     int y2 = (int) ((e.vertex2.location.y - minY) * scale) + margin;
                     g2.drawLine(x1, y1, x2, y2);
 
-                    // weight label at midpoint
                     int mx = (x1 + x2) / 2;
                     int my = (y1 + y2) / 2;
                     g2.setColor(new Color(80, 80, 80));
@@ -379,7 +372,6 @@ public class Canvas {
                     g2.setColor(Color.BLACK);
                 }
 
-                // Draw vertices on top
                 int r = 30;
                 for (Vertex v : sV) {
                     int cx = (int) ((v.location.x - minX) * scale) + margin;
@@ -613,9 +605,9 @@ public class Canvas {
                         break;
                     }
                     case 3: {
-                        // Grab Tool now supports multi-select for subgraph:
-                        //   - click a vertex to toggle its selection
-                        //   - click empty space to clear all selections
+                        // Grab Tool supports multi-select for the subgraph feature:
+                        //   click a vertex to toggle its selection;
+                        //   click empty space to clear all selections.
                         boolean hitAny = false;
                         for (Vertex v : vertexList) {
                             if (v.hasIntersection(e.getX(), e.getY())) {
@@ -937,8 +929,6 @@ public class Canvas {
     }
 
     private void drawInfoBox(Graphics g) {
-        // Show the info box for the *first* selected vertex. If more than one
-        // is selected, also show the total count.
         Vertex clicked = null;
         int selCount = 0;
         for (Vertex v : vertexList) {

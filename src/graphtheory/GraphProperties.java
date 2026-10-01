@@ -187,6 +187,77 @@ public class GraphProperties {
         }
     }
 
+    /**
+ * Draws the adjacency list representation of the graph.
+ * For each vertex, lists its undirected neighbors, out-neighbors, and
+ * in-neighbors. Empty categories are omitted, so a purely undirected
+ * graph shows just the undirected bracket, a purely directed graph shows
+ * "out:(...)" and/or "in:(...)".
+ *
+ * Returns the total height used (pixels), so callers can stack another
+ * panel below it.
+ */
+public int drawAdjacencyList(Graphics g, Vector<Vertex> vList, int x, int y) {
+    int rowH = 18;
+
+    g.setColor(Color.BLACK);
+    g.drawString("Adjacency List", x, y - 5);
+
+    int ty = y + rowH;
+    for (Vertex v : vList) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(v.name).append(" : ");
+
+        boolean wroteSomething = false;
+
+        // Undirected neighbors
+        if (!v.undirectedNeighbors.isEmpty()) {
+            sb.append("[");
+            for (int i = 0; i < v.undirectedNeighbors.size(); i++) {
+                if (i > 0) sb.append(", ");
+                sb.append(v.undirectedNeighbors.get(i).name);
+            }
+            sb.append("]");
+            wroteSomething = true;
+        }
+
+        // Out-neighbors (directed)
+        if (!v.outNeighbors.isEmpty()) {
+            if (wroteSomething) sb.append("  ");
+            sb.append("out:(");
+            for (int i = 0; i < v.outNeighbors.size(); i++) {
+                if (i > 0) sb.append(", ");
+                sb.append(v.outNeighbors.get(i).name);
+            }
+            sb.append(")");
+            wroteSomething = true;
+        }
+
+        // In-neighbors (directed)
+        if (!v.inNeighbors.isEmpty()) {
+            if (wroteSomething) sb.append("  ");
+            sb.append("in:(");
+            for (int i = 0; i < v.inNeighbors.size(); i++) {
+                if (i > 0) sb.append(", ");
+                sb.append(v.inNeighbors.get(i).name);
+            }
+            sb.append(")");
+            wroteSomething = true;
+        }
+
+        // Isolated vertex — nothing above was written
+        if (!wroteSomething) {
+            sb.append("(isolated)");
+        }
+
+        g.setColor(Color.BLACK);
+        g.drawString(sb.toString(), x + 4, ty);
+        ty += rowH;
+    }
+
+    return (vList.size() + 1) * rowH + 6;
+}
+
     // ---- Bridge detection (Tarjan) ----
 
     public void computeBridges(Vector<Vertex> vList, Vector<Edge> eList) {
