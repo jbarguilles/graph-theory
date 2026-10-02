@@ -648,12 +648,86 @@ public class GraphProperties {
         return false;
     }
 
-    public boolean hasPerfectMatching(Vector<Vertex> vList, Vector<Edge> eList) {
-        if (vList.size() % 2 != 0) return false;
+   // ---- Perfect matching (general graphs) ----
+
+/**
+ * Cap on vertices for the exact non-bipartite perfect-matching search.
+ * Backtracking is exponential in the worst case, so we skip above this.
+ * 20 is a safe bound for interactive use on a desktop.
+ */
+public static final int PERFECT_MATCHING_VERTEX_CAP = 20;
+
+/**
+ * True if the graph has a perfect matching (a set of disjoint edges
+ * covering every vertex exactly once).
+ *
+ * Fast path: bipartite graphs use the polynomial augmenting-path method.
+ * General path: non-bipartite graphs use backtracking, capped at
+ * PERFECT_MATCHING_VERTEX_CAP vertices. Above the cap we return false
+ * (conservative — the UI shows "No" rather than hanging).
+ */
+public boolean hasPerfectMatching(Vector<Vertex> vList, Vector<Edge> eList) {
+    int n = vList.size();
+    if (n == 0) return true;          // vacuously true
+    if (n % 2 != 0) return false;     // odd number of vertices can't be perfectly matched
+
+    // Fast path: bipartite graphs are handled exactly by the augmenting-path method.
+    Vector<Vertex>[] sides = bipartiteSides(vList);
+    if (sides != null) {
         Vector<Edge> mm = maximumBipartiteMatching(vList, eList);
-        if (mm == null) return false;
-        return mm.size() * 2 == vList.size();
+        return mm != null && mm.size() * 2 == n;
     }
+
+    // General (non-bipartite) path: exponential backtracking, capped.
+    if (n > PERFECT_MATCHING_VERTEX_CAP) return false;
+
+    // Build a usable neighbor list per vertex: distinct vertices reachable by at
+    // least one edge, excluding self-loops (a loop can never match two vertices).
+    Map<Vertex, List<Vertex>> nbrs = new HashMap<Vertex, List<Vertex>>();
+    for (Vertex v : vList) nbrs.put(v, new ArrayList<Vertex>());
+    for (Edge e : eList) {
+        if (e.vertex1 == e.vertex2) continue;             // self-loop: ignore
+        if (!vList.contains(e.vertex1) || !vList.contains(e.vertex2)) continue;
+        if (!nbrs.get(e.vertex1).contains(e.vertex2)) nbrs.get(e.vertex1).add(e.vertex2);
+        if (!nbrs.get(e.vertex2).contains(e.vertex1)) nbrs.get(e.vertex2).add(e.vertex1);
+    }
+
+    // Quick reject: any vertex with no usable neighbor makes a perfect matching impossible.
+    for (Vertex v : vList) {
+        if (nbrs.get(v).isEmpty()) return false;
+    }
+
+    // Order vertices by increasing degree: the most constrained vertex is tried first,
+    // which prunes the search dramatically.
+    List<Vertex> order = new ArrayList<Vertex>(vList);
+    order.sort((a, b) -> Integer.compare(nbrs.get(a).size(), nbrs.get(b).size()));
+
+    Set<Vertex> matched = new HashSet<Vertex>();
+    return tryMatch(order, 0, nbrs, matched);
+}
+
+/**
+ * Backtracking: try to match order[idx] with some still-unmatched neighbor.
+ * 'matched' holds vertices already paired by earlier decisions.
+ */
+private boolean tryMatch(List<Vertex> order, int idx,
+                         Map<Vertex, List<Vertex>> nbrs, Set<Vertex> matched) {
+    // Skip vertices already matched by an earlier step.
+    while (idx < order.size() && matched.contains(order.get(idx))) idx++;
+    if (idx == order.size()) return true;        // every vertex is matched
+
+    Vertex v = order.get(idx);
+    for (Vertex u : nbrs.get(v)) {
+        if (matched.contains(u) || u == v) continue;
+
+        matched.add(v);
+        matched.add(u);
+        if (tryMatch(order, idx + 1, nbrs, matched)) return true;
+        matched.remove(v);
+        matched.remove(u);
+    }
+    return false;
+}
 
     public Vector<Edge> stableMatching(Vector<Vertex> vList, Vector<Edge> eList) {
         Vector<Vertex>[] sides = bipartiteSides(vList);
