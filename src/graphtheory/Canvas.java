@@ -1027,22 +1027,7 @@ public class Canvas {
     }
 
     private void arrangeVertices() {
-        if (vertexList.isEmpty()) return;
-        double deg2rad = Math.PI / 180;
-        double radius = height / 5;
-        double centerX = width / 2;
-        double centerY = height / 2;
-        int interval = 360 / vertexList.size();
-
-        for (int i = 0; i < vertexList.size(); i++) {
-            double degInRad = i * deg2rad * interval;
-            double x = centerX + (Math.cos(degInRad) * radius);
-            double y = centerY + (Math.sin(degInRad) * radius);
-            int X = (int) x;
-            int Y = (int) y;
-            vertexList.get(i).location.x = X;
-            vertexList.get(i).location.y = Y;
-        }
+        Layout.arrangeOnCircle(vertexList, width, height);
     }
 
     private void reloadVertexConnections(int[][] aMatrix, Vector<Vertex> vList) {
