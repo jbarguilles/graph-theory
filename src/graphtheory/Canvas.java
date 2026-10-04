@@ -36,6 +36,9 @@ public class Canvas {
     private int selectedWindow;
     public int width,  height;
     private int clickedVertexIndex = -1;
+    private final EditHistory history = new EditHistory(50);
+    private JMenuItem undoItem;
+    private JMenuItem redoItem;
     private int clickedEdgeIndex;
     private int pairedVertex1Index = -1;
     private int pairedVertex2Index = -1;
@@ -155,6 +158,9 @@ public class Canvas {
         addItem(file, "Exit", null);
 
         JMenu edit = new JMenu("Edit");
+        undoItem = addItem(edit, "Undo", KeyStroke.getKeyStroke(KeyEvent.VK_Z, KeyEvent.CTRL_DOWN_MASK));
+        redoItem = addItem(edit, "Redo", KeyStroke.getKeyStroke(KeyEvent.VK_Y, KeyEvent.CTRL_DOWN_MASK));
+        edit.addSeparator();
         addItem(edit, "Remove All", null);
 
         JMenu tools = new JMenu("Tools");
@@ -237,6 +243,7 @@ public class Canvas {
     /** Call after an edit with the snapshot from before it. */
     private void afterEdit(String before) {
         if (!before.equals(snapshot())) {
+            history.record(before);
             markGraphDirty();
             if (selectedWindow == 1) computeProperties();
         }
@@ -253,6 +260,10 @@ public class Canvas {
 
     private void updateTitle() {
         frame.setTitle(documentName() + (isModified() ? "*" : "") + " \u2014 " + appName);
+        if (undoItem != null) {
+            undoItem.setEnabled(history.canUndo());
+            redoItem.setEnabled(history.canRedo());
+        }
     }
 
     /** Swaps in a whole new graph (New, Open, Remove All, undo); clears analysis state. */
@@ -281,9 +292,31 @@ public class Canvas {
         return choice == 1;
     }
 
+    private void undo() {
+        String previous = history.undo(snapshot());
+        if (previous != null) restore(previous);
+    }
+
+    private void redo() {
+        String next = history.redo(snapshot());
+        if (next != null) restore(next);
+    }
+
+    /** Rebuilds the graph from a snapshot. The walk and pair are cleared: their vertices are gone. */
+    private void restore(String text) {
+        try {
+            GraphFile.Data d = GraphFile.read(text);
+            replaceGraph(d.vertices, d.edges);
+        } catch (GraphFile.FormatException ex) {
+            throw new IllegalStateException("Undo snapshot did not parse: " + ex.getMessage());
+        }
+        updateTitle();
+    }
+
     private void newGraph() {
         if (!confirmDiscard("starting a new graph")) return;
         replaceGraph(new Vector<Vertex>(), new Vector<Edge>());
+        history.clear();
         currentFile = null;
         savedText = snapshot();
         tabs.setSelectedIndex(0);
@@ -305,6 +338,7 @@ public class Canvas {
         Layout.arrangeOnCircle(d.unplaced, width, height);
         Layout.clampInto(d.vertices, width, height);
         replaceGraph(d.vertices, d.edges);
+        history.clear();
         currentFile = f;
         // If arranging or clamping moved anything, the graph now differs from the file: unsaved changes.
         savedText = asWritten;
@@ -1190,6 +1224,10 @@ public class Canvas {
                 gP.greedyColoring(vertexList);
             } else if (command.equals("Clear Coloring")) {
                 gP.clearColoring(vertexList);
+            } else if (command.equals("Undo")) {
+                undo();
+            } else if (command.equals("Redo")) {
+                redo();
             } else if (command.equals("Remove All")) {
                 removeAll();
             } else if (command.equals("New")) {
