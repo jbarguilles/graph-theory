@@ -283,7 +283,7 @@ public class Canvas {
     private void editEdgeWeight(Edge target) {
         String input = JOptionPane.showInputDialog(
                 frame,
-                "Edge " + target.vertex1.name + " → " + target.vertex2.name
+                "Edge " + target.vertex1.name + " \u2192 " + target.vertex2.name
                      + (target.directed ? " (directed)" : " (undirected)")
                      + "\nEnter new weight (non-negative integer):",
                 "" + target.weight);
