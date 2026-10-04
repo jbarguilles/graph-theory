@@ -122,4 +122,86 @@ public class GraphFileTest {
         assertEquals("root", d.vertices.get(0).name);
         assertFalse(d.vertices.get(0).isRoot);
     }
+
+    static void assertRejected(String expectedMessage, String... lines) {
+        try {
+            read(lines);
+            fail("expected FormatException: " + expectedMessage);
+        } catch (GraphFile.FormatException ex) {
+            assertEquals(expectedMessage, ex.getMessage());
+        }
+    }
+
+    @Test
+    public void rejects_emptyFile() {
+        assertRejected("Line 1: empty file (expected 'graph-theory 1')", "", "# nothing here");
+    }
+
+    @Test
+    public void rejects_missingHeader() {
+        assertRejected("Line 1: not a graph file (expected 'graph-theory 1')", "vertex a");
+    }
+
+    @Test
+    public void rejects_otherVersion() {
+        assertRejected("Line 1: unsupported version (this app reads 'graph-theory 1')", "graph-theory 2");
+    }
+
+    @Test
+    public void rejects_unknownKeyword() {
+        assertRejected("Line 2: unknown keyword 'node' (expected vertex, edge or arc)",
+                       "graph-theory 1", "node a");
+    }
+
+    @Test
+    public void rejects_unknownVertex() {
+        assertRejected("Line 3: unknown vertex 'q' (declare it with a vertex line first)",
+                       "graph-theory 1", "vertex a", "edge a q");
+    }
+
+    @Test
+    public void rejects_duplicateVertex() {
+        assertRejected("Line 3: vertex 'a' is already declared",
+                       "graph-theory 1", "vertex a", "vertex a 1 1");
+    }
+
+    @Test
+    public void rejects_invalidName() {
+        assertRejected("Line 2: invalid vertex name 'abcde' (1-4 letters, digits or _)",
+                       "graph-theory 1", "vertex abcde");
+    }
+
+    @Test
+    public void rejects_negativeWeight() {
+        assertRejected("Line 3: weight must not be negative",
+                       "graph-theory 1", "vertex a", "edge a a -1");
+    }
+
+    @Test
+    public void rejects_nonNumber() {
+        assertRejected("Line 2: 'x' is not a whole number", "graph-theory 1", "vertex a x 5");
+    }
+
+    @Test
+    public void rejects_vertexWithOneCoordinate() {
+        assertRejected("Line 2: expected 'vertex <name> [<x> <y>] [root]'",
+                       "graph-theory 1", "vertex a 5");
+    }
+
+    @Test
+    public void rejects_edgeWithOneEnd() {
+        assertRejected("Line 3: expected 'arc <from> <to> [<weight>]'",
+                       "graph-theory 1", "vertex a", "arc a");
+    }
+
+    @Test
+    public void rejects_twoRootsInOneComponent() {
+        assertRejected("Line 4: 'c' is a second root in the same component as 'a'",
+                       "graph-theory 1",
+                       "vertex a root",
+                       "vertex b",
+                       "vertex c root",
+                       "edge a b",
+                       "arc b c");
+    }
 }
