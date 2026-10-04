@@ -60,12 +60,12 @@ public class Canvas {
 
     private boolean graphDirty = true;
 
-    // Build Walk tool (tool 7)
+    // Build Walk tool (Tools.WALK)
     private Walk currentWalk = null;
     private String walkMessage = null;
     private static final Color WALK_COLOR = new Color(0, 150, 150);
 
-    // Paths for the selected pair (tool 6), browsed one at a time
+    // Paths for the selected pair (Tools.PAIR), browsed one at a time
     private Vector<Walk> pairPaths = null;
     private int selectedPathIndex = 0;
     private static final Color PATH_COLOR = new Color(220, 160, 0);

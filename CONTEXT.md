@@ -20,7 +20,7 @@ A point in the graph. Has a name, a canvas location, and three neighbor lists:
 
 **Isolated** — a vertex with no incident edges of any kind (degree = 0, in-degree = 0, out-degree = 0). Determined by `isIsolated()` method; not stored as a flag.
 
-**Cutpoint** (articulation point) — a vertex whose removal increases the number of connected components. Computed using Tarjan's DFS algorithm, treating all edges as undirected. Stored as `isCutpoint` on the vertex. Recomputed only when the Properties tab is opened.
+**Cutpoint** (articulation point) — a vertex whose removal increases the number of connected components. Computed using Tarjan's DFS algorithm, treating all edges as undirected. Stored as `isCutpoint` on the vertex. Recomputed whenever the graph changes.
 
 **Root** — a user-designated vertex within a rooted tree or forest. At most one root per connected component. Stored as `isRoot` on the vertex. When a new edge joins two components that each have a root, the root of the component the edge starts from (the drag's first vertex) stays; the other stops being a root.
 
@@ -42,7 +42,7 @@ A connection between two vertices. Every edge is either **directed** or **undire
 
 A set of vertices and edges. This project supports **mixed graphs** — graphs containing both directed and undirected edges simultaneously.
 
-**Graph file** — a saved graph: its vertices (name, position, root) and edges (endpoints, direction, weight). It holds nothing derived or analytical — no cutpoints, coloring, walks or selected pair.
+**Graph file** — a saved graph: its vertices (name, position, root) and edges (endpoints, direction, weight). It holds nothing derived or analytical — no cutpoints, coloring, walks or selected pair. Opening a file whose vertices lack positions arranges them, which counts as an unsaved change.
 
 **Unsaved changes** — any edit to what a graph file holds, including moving a vertex. Analysis (coloring, building walks, selecting a pair, viewing Properties) is never an unsaved change.
 
@@ -111,4 +111,4 @@ They follow the walk rules exactly, including direction, so there is no minimum 
 
 - **Graph window**: clicking a vertex shows its node properties in a fixed info box (degree, in-degree, out-degree, isolated, cutpoint, root).
 - **Properties tab**: shows a table of node properties for all vertices, plus the adjacency matrix and distance matrix. It sits beside the **Graph** tab and is recomputed whenever it is opened.
-- **Color coding on canvas**: root = green ring, cutpoint = orange ring, isolated = grey ring. Cutpoint color persists from the last Properties tab computation.
+- **Color coding on canvas**: root = green ring, cutpoint = orange ring, isolated = grey ring.
