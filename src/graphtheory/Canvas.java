@@ -11,7 +11,6 @@ import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
-import java.awt.Toolkit;
 import java.awt.event.KeyEvent;
 import java.util.ArrayDeque;
 import java.util.HashSet;
@@ -23,16 +22,14 @@ import javax.swing.event.ChangeListener;
 public class Canvas {
 
     public JFrame frame;
-    private JMenuBar menuBar;
     private CanvasPane canvas;
     private JScrollPane propertiesScroll;
     private JPanel propertiesContent;
     private Graphics2D graphic;
     private Color backgroundColour;
-    private Image canvasImage,  canvasImage2;
+    private Image canvasImage;
     private int selectedTool;
     private int selectedWindow;
-    private Dimension screenSize;
     public int width,  height;
     private int clickedVertexIndex;
     private int clickedEdgeIndex;
@@ -99,6 +96,7 @@ public class Canvas {
         propertiesScroll.setPreferredSize(new Dimension(width, height));
 
         tabs = new JTabbedPane();
+        tabs.setFocusable(false);
         tabs.addTab("Graph", graphPanel);
         tabs.addTab("Properties", propertiesScroll);
         tabs.addChangeListener(new ChangeListener() {
@@ -1051,6 +1049,7 @@ public class Canvas {
                 showAbout();
             }
 
+            if (selectedWindow == 1) computeProperties();
             refresh();
         }
     }
@@ -1142,7 +1141,6 @@ public class Canvas {
         if (graphic == null) {
             Dimension size = new Dimension(width, height);
             canvasImage = canvas.createImage(size.width, size.height);
-            canvasImage2 = canvas.createImage(size.width, size.height);
             graphic = (Graphics2D) canvasImage.getGraphics();
             graphic.setColor(backgroundColour);
             graphic.fillRect(0, 0, size.width, size.height);
