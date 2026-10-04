@@ -466,16 +466,6 @@ public class Canvas {
         return visited;
     }
 
-    private String nextAvailableVertexName() {
-        Set<String> used = new HashSet<String>();
-        for (Vertex v : vertexList) {
-            used.add(v.name);
-        }
-        int i = 0;
-        while (used.contains("" + i)) i++;
-        return "" + i;
-    }
-
     private Vector<Vector> buildInducedSubgraph() {
         Vector<Vertex> selV = new Vector<Vertex>();
         for (Vertex v : vertexList) {
@@ -575,7 +565,7 @@ public class Canvas {
             if (selectedWindow == 0) {
                 switch (selectedTool) {
                     case 1: {
-                        String name = nextAvailableVertexName();
+                        String name = VertexNames.nextFree(vertexList);
                         Vertex v = new Vertex(name, e.getX(), e.getY());
                         vertexList.add(v);
                         v.draw(graphic);
