@@ -266,6 +266,63 @@ public class Canvas {
         }
     }
 
+    private Vertex vertexAt(int x, int y) {
+        for (Vertex v : vertexList) {
+            if (v.hasIntersection(x, y)) return v;
+        }
+        return null;
+    }
+
+    private Edge edgeAt(int x, int y) {
+        for (Edge ed : edgeList) {
+            if (ed.hasIntersection(x, y)) return ed;
+        }
+        return null;
+    }
+
+    private void editEdgeWeight(Edge target) {
+        String input = JOptionPane.showInputDialog(
+                frame,
+                "Edge " + target.vertex1.name + " → " + target.vertex2.name
+                     + (target.directed ? " (directed)" : " (undirected)")
+                     + "\nEnter new weight (non-negative integer):",
+                "" + target.weight);
+        if (input == null) return;
+        try {
+            int w = Integer.parseInt(input.trim());
+            if (w < 0) {
+                JOptionPane.showMessageDialog(frame,
+                        "Dijkstra requires non-negative weights.",
+                        "Invalid weight",
+                        JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            target.setWeight(w);
+        } catch (NumberFormatException ex) {
+            JOptionPane.showMessageDialog(frame,
+                    "Please enter a whole number.",
+                    "Invalid weight",
+                    JOptionPane.WARNING_MESSAGE);
+        }
+    }
+
+    /** Asks for a new name until it is valid and unused, or the user cancels. */
+    private void renameVertex(Vertex v) {
+        String prompt = "New name for vertex " + v.name + " (" + VertexNames.RULE + "):";
+        String input = (String) JOptionPane.showInputDialog(frame, prompt, "Rename Vertex",
+                JOptionPane.PLAIN_MESSAGE, null, null, v.name);
+        while (input != null) {
+            String name = input.trim();
+            String problem = VertexNames.checkRename(v, name, vertexList);
+            if (problem == null) {
+                v.name = name;
+                return;
+            }
+            input = (String) JOptionPane.showInputDialog(frame, problem + "\n" + prompt, "Rename Vertex",
+                    JOptionPane.WARNING_MESSAGE, null, null, input);
+        }
+    }
+
     /** Swaps in a whole new graph (New, Open, Remove All, undo); clears analysis state. */
     private void replaceGraph(Vector<Vertex> vs, Vector<Edge> es) {
         vertexList = vs;
@@ -949,41 +1006,25 @@ public class Canvas {
                         break;
                     }
                     case 7: {
-                        Edge target = null;
-                        for (Edge ed : edgeList) {
-                            if (ed.hasIntersection(e.getX(), e.getY())) {
-                                target = ed;
-                                break;
-                            }
+                        Edge target = edgeAt(e.getX(), e.getY());
+                        if (target != null) {
+                            editEdgeWeight(target);
+                            refresh();
                         }
-                        if (target == null) break;
-
-                        String input = JOptionPane.showInputDialog(
-                                frame,
-                                "Edge " + target.vertex1.name + " \u2192 " + target.vertex2.name
-                                     + (target.directed ? " (directed)" : " (undirected)")
-                                     + "\nEnter new weight (non-negative integer):",
-                                "" + target.weight);
-
-                        if (input != null) {
-                            try {
-                                int w = Integer.parseInt(input.trim());
-                                if (w < 0) {
-                                    JOptionPane.showMessageDialog(frame,
-                                            "Dijkstra requires non-negative weights.",
-                                            "Invalid weight",
-                                            JOptionPane.WARNING_MESSAGE);
-                                    break;
-                                }
-                                target.setWeight(w);
-                                markGraphDirty();
-                                refresh();
-                            } catch (NumberFormatException ex) {
-                                JOptionPane.showMessageDialog(frame,
-                                        "Please enter a whole number.",
-                                        "Invalid weight",
-                                        JOptionPane.WARNING_MESSAGE);
-                            }
+                        break;
+                    }
+                    case 3: {
+                        if (e.getClickCount() != 2) break;
+                        Vertex hitV = vertexAt(e.getX(), e.getY());
+                        if (hitV != null) {
+                            renameVertex(hitV);
+                            refresh();
+                            break;
+                        }
+                        Edge hitE = edgeAt(e.getX(), e.getY());
+                        if (hitE != null) {
+                            editEdgeWeight(hitE);
+                            refresh();
                         }
                         break;
                     }
