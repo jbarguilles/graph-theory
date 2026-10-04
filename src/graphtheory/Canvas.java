@@ -16,8 +16,6 @@ import java.awt.event.WindowEvent;
 import java.io.File;
 import java.io.IOException;
 import java.awt.event.KeyEvent;
-import java.util.ArrayDeque;
-import java.util.HashSet;
 import java.util.Set;
 import java.util.Vector;
 import javax.swing.event.ChangeEvent;
@@ -366,7 +364,10 @@ public class Canvas {
             GraphFile.Data d = GraphFile.read(text);
             replaceGraph(d.vertices, d.edges);
         } catch (GraphFile.FormatException ex) {
-            throw new IllegalStateException("Undo snapshot did not parse: " + ex.getMessage());
+            showError("Couldn't undo", ex.getMessage());
+            history.clear();
+            updateTitle();
+            return;
         }
         updateTitle();
     }
@@ -732,7 +733,7 @@ public class Canvas {
      */
     private void findTraversal(String kind) {
         selectedTool = Tools.WALK;
-        palette.setSelectedTool(Tools.WALK);
+        palette.setSelectedTool(tool 7);
         tabs.setSelectedIndex(0);
         clearWalk();
         if (kind.startsWith("Hamiltonian") && Traversals.hamiltonTooLarge(vertexList)) {
@@ -760,17 +761,7 @@ public class Canvas {
     }
 
     private Set<Vertex> connectedComponentOf(Vertex start) {
-        Set<Vertex> visited = new HashSet<Vertex>();
-        ArrayDeque<Vertex> queue = new ArrayDeque<Vertex>();
-        visited.add(start);
-        queue.add(start);
-        while (!queue.isEmpty()) {
-            Vertex u = queue.poll();
-            for (Vertex n : u.undirectedNeighbors) if (visited.add(n)) queue.add(n);
-            for (Vertex n : u.outNeighbors)        if (visited.add(n)) queue.add(n);
-            for (Vertex n : u.inNeighbors)         if (visited.add(n)) queue.add(n);
-        }
-        return visited;
+        return Components.of(start, edgeList);
     }
 
     /** The root of start's connected component, or null. */
@@ -950,9 +941,9 @@ public class Canvas {
                             edgeList.removeAll(toRemove);
 
                             for (Vertex v : vertexList) {
-                                v.undirectedNeighbors.remove(victim);
-                                v.inNeighbors.remove(victim);
-                                v.outNeighbors.remove(victim);
+                                v.undirectedNeighbors.removeAll(java.util.Collections.singleton(victim));
+                                v.inNeighbors.removeAll(java.util.Collections.singleton(victim));
+                                v.outNeighbors.removeAll(java.util.Collections.singleton(victim));
                             }
 
                             if (pairedVertex1Index >= 0
