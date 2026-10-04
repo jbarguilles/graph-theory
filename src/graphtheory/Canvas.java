@@ -17,6 +17,8 @@ import java.util.ArrayDeque;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.Vector;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
 
 public class Canvas {
 
@@ -38,6 +40,12 @@ public class Canvas {
     private int pairedVertex2Index = -1;
     private VertexPair currentPairVP = null;
     private FileManager fileManager = new FileManager();
+    private final String appName;
+    private final MenuListener menuListener = new MenuListener();
+    private JTabbedPane tabs;
+    private ToolPalette palette;
+    private JLabel statusHint;
+    private JLabel statusCounts;
 
     /////////////
     private Vector<Vertex> vertexList;
@@ -58,127 +66,186 @@ public class Canvas {
     private static final Color PATH_COLOR = new Color(220, 160, 0);
     private static final int PATH_ROWS = 6;
 
-    public Canvas(String title, int width, int height, Color bgColour) {
-        frame = new JFrame();
-        frame.setTitle(title);
+    public Canvas(String appName, int width, int height, Color bgColour) {
+        this.appName = appName;
+        this.width = width;
+        this.height = height;
+        backgroundColour = bgColour;
+        vertexList = new Vector<Vertex>();
+        edgeList = new Vector<Edge>();
+
+        frame = new JFrame(appName);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setResizable(false);
+
         canvas = new CanvasPane();
+        canvas.setPreferredSize(new Dimension(width, height));
         InputListener inputListener = new InputListener();
         canvas.addMouseListener(inputListener);
         canvas.addMouseMotionListener(inputListener);
         installKeyBindings();
-        frame.setContentPane(canvas);
 
-        this.width = width;
-        this.height = height;
-        canvas.setPreferredSize(new Dimension(width, height));
-
-        //events
-        menuBar = new JMenuBar();
-        JMenu menuOptions = new JMenu("Tools");
-        JMenu menuOptions1 = new JMenu("File");
-        JMenu menuOptions2 = new JMenu("Extras");
-        JMenu menuOptions3 = new JMenu("Window");
-
-        JMenuItem item = new JMenuItem("Add Vertex");
-        item.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_A, KeyEvent.CTRL_DOWN_MASK));
-        item.addActionListener(new MenuListener());
-        menuOptions.add(item);
-        item = new JMenuItem("Open File");
-        item.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_O, KeyEvent.CTRL_DOWN_MASK));
-        item.addActionListener(new MenuListener());
-        menuOptions1.add(item);
-        item = new JMenuItem("Save to File");
-        item.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_S, KeyEvent.CTRL_DOWN_MASK));
-        item.addActionListener(new MenuListener());
-        menuOptions1.add(item);
-        item = new JMenuItem("Add Edges");
-        item.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_E, KeyEvent.CTRL_DOWN_MASK));
-        item.addActionListener(new MenuListener());
-        menuOptions.add(item);
-        item = new JMenuItem("Add Directed Edge");
-        item.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_D, KeyEvent.CTRL_DOWN_MASK));
-        item.addActionListener(new MenuListener());
-        menuOptions.add(item);
-        item = new JMenuItem("Grab Tool");
-        item.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_G, KeyEvent.CTRL_DOWN_MASK));
-        item.addActionListener(new MenuListener());
-        menuOptions.add(item);
-        item = new JMenuItem("Select Pair");
-        item.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_P, KeyEvent.CTRL_DOWN_MASK));
-        item.addActionListener(new MenuListener());
-        menuOptions.add(item);
-        item = new JMenuItem("Remove Tool");
-        item.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_R, KeyEvent.CTRL_DOWN_MASK));
-        item.addActionListener(new MenuListener());
-        menuOptions.add(item);
-        item = new JMenuItem("Build Walk");
-        item.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_L, KeyEvent.CTRL_DOWN_MASK));
-        item.addActionListener(new MenuListener());
-        menuOptions.add(item);
-        item = new JMenuItem("Set Edge Weight");
-        item.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_W, KeyEvent.CTRL_DOWN_MASK));
-        item.addActionListener(new MenuListener());
-        menuOptions.add(item);
-        item = new JMenuItem("Auto Arrange Vertices");
-        item.addActionListener(new MenuListener());
-        menuOptions2.add(item);
-
-        item = new JMenuItem("Show Induced Subgraph");
-        item.addActionListener(new MenuListener());
-        menuOptions2.add(item);
-
-        item = new JMenuItem("Show Greedy Coloring");
-        item.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_C, KeyEvent.CTRL_DOWN_MASK));
-        item.addActionListener(new MenuListener());
-        menuOptions2.add(item);
-
-        item = new JMenuItem("Clear Coloring");
-        item.addActionListener(new MenuListener());
-        menuOptions2.add(item);
-
-        item = new JMenuItem("Remove All");
-        item.addActionListener(new MenuListener());
-        menuOptions2.add(item);
-
-        item = new JMenuItem("Mark as Root");
-        item.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_T, KeyEvent.CTRL_DOWN_MASK));
-        item.addActionListener(new MenuListener());
-        menuOptions2.add(item);
-        menuOptions2.addSeparator();
-        for (String find : new String[] {"Find Euler Trail", "Find Euler Tour",
-                                         "Find Hamiltonian Path", "Find Hamiltonian Cycle"}) {
-            item = new JMenuItem(find);
-            item.addActionListener(new MenuListener());
-            menuOptions2.add(item);
-        }
-
-        item = new JMenuItem("Graph");
-        item.addActionListener(new MenuListener());
-        menuOptions3.add(item);
-        item = new JMenuItem("Properties");
-        item.addActionListener(new MenuListener());
-        menuOptions3.add(item);
-
-        menuBar.add(menuOptions1);
-        menuBar.add(menuOptions);
-        menuBar.add(menuOptions2);
-        menuBar.add(menuOptions3);
-
-        frame.setJMenuBar(menuBar);
-
-        backgroundColour = bgColour;
-
-        screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-        frame.setBounds(screenSize.width / 2 - width / 2, screenSize.height / 2 - height / 2, width, height);
-        frame.pack();
-        setVisible(true);
-
-        vertexList = new Vector<Vertex>();
-        edgeList = new Vector<Edge>();
+        palette = new ToolPalette(new ToolPalette.Listener() {
+            public void toolSelected(int tool) {
+                selectTool(tool);
+            }
+        });
+        JPanel graphPanel = new JPanel(new BorderLayout());
+        graphPanel.add(palette, BorderLayout.WEST);
+        graphPanel.add(canvas, BorderLayout.CENTER);
 
         buildPropertiesPanel();
+        // Without this the tab would take the (huge) preferred size of the properties content.
+        propertiesScroll.setPreferredSize(new Dimension(width, height));
+
+        tabs = new JTabbedPane();
+        tabs.addTab("Graph", graphPanel);
+        tabs.addTab("Properties", propertiesScroll);
+        tabs.addChangeListener(new ChangeListener() {
+            public void stateChanged(ChangeEvent e) {
+                onTabChanged();
+            }
+        });
+
+        statusHint = new JLabel(" ");
+        statusCounts = new JLabel(" ");
+        JPanel status = new JPanel(new BorderLayout(12, 0));
+        status.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(1, 0, 0, 0, Color.LIGHT_GRAY),
+                BorderFactory.createEmptyBorder(3, 8, 3, 8)));
+        status.add(statusHint, BorderLayout.CENTER);
+        status.add(statusCounts, BorderLayout.EAST);
+
+        JPanel root = new JPanel(new BorderLayout());
+        root.add(tabs, BorderLayout.CENTER);
+        root.add(status, BorderLayout.SOUTH);
+        frame.setContentPane(root);
+
+        buildMenuBar();
+        frame.pack();
+        frame.setLocationRelativeTo(null);
+        setVisible(true);        // creates the canvas image, so it must come before refresh()
+        selectTool(Tools.VERTEX);
+    }
+
+    private void buildMenuBar() {
+        JMenuBar bar = new JMenuBar();
+
+        JMenu file = new JMenu("File");
+        addItem(file, "Open File", KeyStroke.getKeyStroke(KeyEvent.VK_O, KeyEvent.CTRL_DOWN_MASK));
+        addItem(file, "Save to File", KeyStroke.getKeyStroke(KeyEvent.VK_S, KeyEvent.CTRL_DOWN_MASK));
+
+        JMenu edit = new JMenu("Edit");
+        addItem(edit, "Remove All", null);
+
+        JMenu tools = new JMenu("Tools");
+        for (final int tool : Tools.ORDER) {
+            JMenuItem item = new JMenuItem(Tools.menuLabel(tool));
+            item.setAccelerator(KeyStroke.getKeyStroke(Tools.shortcut(tool), KeyEvent.CTRL_DOWN_MASK));
+            item.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent e) {
+                    selectTool(tool);
+                }
+            });
+            tools.add(item);
+        }
+
+        JMenu extras = new JMenu("Extras");
+        addItem(extras, "Auto Arrange Vertices", null);
+        addItem(extras, "Show Induced Subgraph", null);
+        addItem(extras, "Show Greedy Coloring", KeyStroke.getKeyStroke(KeyEvent.VK_C, KeyEvent.CTRL_DOWN_MASK));
+        addItem(extras, "Clear Coloring", null);
+        extras.addSeparator();
+        for (String find : new String[] {"Find Euler Trail", "Find Euler Tour",
+                                         "Find Hamiltonian Path", "Find Hamiltonian Cycle"}) {
+            addItem(extras, find, null);
+        }
+
+        JMenu window = new JMenu("Window");
+        addItem(window, "Graph", null);
+        addItem(window, "Properties", null);
+
+        JMenu help = new JMenu("Help");
+        addItem(help, "About", null);
+
+        bar.add(file);
+        bar.add(edit);
+        bar.add(tools);
+        bar.add(extras);
+        bar.add(window);
+        bar.add(help);
+        frame.setJMenuBar(bar);
+    }
+
+    private JMenuItem addItem(JMenu menu, String label, KeyStroke key) {
+        JMenuItem item = new JMenuItem(label);
+        if (key != null) item.setAccelerator(key);
+        item.addActionListener(menuListener);
+        menu.add(item);
+        return item;
+    }
+
+    /** From the palette or the Tools menu. */
+    private void selectTool(int tool) {
+        clearHover();
+        walkMessage = null;
+        selectedTool = tool;
+        if (tool == Tools.PAIR) {
+            pairedVertex1Index = -1;
+            pairedVertex2Index = -1;
+            currentPairVP = null;
+            pairPaths = null;
+        } else if (tool == Tools.WALK) {
+            clearWalk();
+        }
+        palette.setSelectedTool(tool);
+        tabs.setSelectedIndex(0);
+        refresh();
+    }
+
+    private void onTabChanged() {
+        selectedWindow = tabs.getSelectedIndex();
+        clearHover();
+        if (selectedWindow == 1) computeProperties();
+        refresh();
+    }
+
+    /** Recomputes what the Properties tab shows. */
+    private void computeProperties() {
+        if (vertexList.size() > 0) {
+            int[][] matrix = gP.generateAdjacencyMatrix(vertexList, edgeList);
+
+            gP.vertexConnectivity(vertexList);
+            gP.edgeConnectivity(vertexList, edgeList);
+
+            for (Vertex v : vertexList) v.wasClicked = false;
+            for (Edge ed : edgeList)    ed.wasClicked = false;
+
+            for (Vertex v : gP.witnessVertices) v.wasClicked = true;
+            for (Edge ed : gP.witnessEdges)     ed.wasClicked = true;
+
+            reloadVertexConnections(matrix, vertexList);
+
+            gP.generateDistanceMatrix(vertexList);
+            gP.displayContainers(vertexList);
+        }
+        refreshPropertiesScrollSize();
+    }
+
+    private void updateStatus() {
+        if (statusHint == null) return;
+        statusHint.setText(selectedWindow == 0
+                ? Tools.hint(selectedTool)
+                : "Properties of the current graph. Switch to the Graph tab to edit.");
+        statusCounts.setText(vertexList.size() + " vertices \u00b7 " + edgeList.size() + " edges");
+    }
+
+    private void showAbout() {
+        JOptionPane.showMessageDialog(frame,
+                appName + "\n\n"
+                + "Based on Graph Theory SY08-09 Term3 by Team DGLSS (v0.5).\n"
+                + "Extended by jbarguilles and rcoporto.",
+                "About " + appName, JOptionPane.INFORMATION_MESSAGE);
     }
 
     private void buildPropertiesPanel() {
@@ -425,8 +492,9 @@ public class Canvas {
      * loads the walk found, or says none exists. kind is e.g. "Euler Tour".
      */
     private void findTraversal(String kind) {
-        selectedTool = 9;
-        selectedWindow = 0;
+        selectedTool = Tools.WALK;
+        palette.setSelectedTool(Tools.WALK);
+        tabs.setSelectedIndex(0);
         clearWalk();
         if (kind.startsWith("Hamiltonian") && Traversals.hamiltonTooLarge(vertexList)) {
             walkMessage = "Too large to search (> " + Traversals.HAMILTON_VERTEX_CAP + " vertices)";
@@ -932,31 +1000,8 @@ public class Canvas {
             clearHover();
             walkMessage = null;
 
-            if (command.equals("Add Vertex")) {
-                selectedTool = 1;
-            } else if (command.equals("Add Edges")) {
-                selectedTool = 2;
-            } else if (command.equals("Grab Tool")) {
-                selectedTool = 3;
-            } else if (command.equals("Remove Tool")) {
-                selectedTool = 4;
-            } else if (command.equals("Add Directed Edge")) {
-                selectedTool = 5;
-            } else if (command.equals("Select Pair")) {
-                selectedTool = 6;
-                pairedVertex1Index = -1;
-                pairedVertex2Index = -1;
-                currentPairVP = null;
-                pairPaths = null;
-            } else if (command.equals("Build Walk")) {
-                selectedTool = 9;
-                clearWalk();
-            } else if (command.startsWith("Find ")) {
+            if (command.startsWith("Find ")) {
                 findTraversal(command.substring("Find ".length()));
-            } else if (command.equals("Set Edge Weight")) {
-                selectedTool = 7;
-            } else if (command.equals("Mark as Root")) {
-                selectedTool = 8;
             } else if (command.equals("Auto Arrange Vertices")) {
                 arrangeVertices();
             } else if (command.equals("Show Induced Subgraph")) {
@@ -971,10 +1016,8 @@ public class Canvas {
                 }
             } else if (command.equals("Show Greedy Coloring")) {
                 gP.greedyColoring(vertexList);
-                refresh();
             } else if (command.equals("Clear Coloring")) {
                 gP.clearColoring(vertexList);
-                refresh();
             } else if (command.equals("Remove All")) {
                 edgeList.removeAllElements();
                 vertexList.removeAllElements();
@@ -993,47 +1036,19 @@ public class Canvas {
                     currentPairVP = null;
                     pairPaths = null;
                     loadFile(fileManager.loadFile(fileManager.jF.getSelectedFile()));
-                    System.out.println(fileManager.jF.getSelectedFile());
-                    selectedWindow = 0;
-                    frame.setContentPane(canvas);
-                    frame.revalidate();
-                    frame.repaint();
+                    tabs.setSelectedIndex(0);
                 }
             } else if (command.equals("Save to File")) {
                 int returnValue = fileManager.jF.showSaveDialog(frame);
                 if (returnValue == JFileChooser.APPROVE_OPTION) {
                     fileManager.saveFile(vertexList, edgeList, fileManager.jF.getSelectedFile());
-                    System.out.println(fileManager.jF.getSelectedFile());
                 }
             } else if (command.equals("Graph")) {
-                selectedWindow = 0;
-                frame.setContentPane(canvas);
-                frame.revalidate();
-                frame.repaint();
+                tabs.setSelectedIndex(0);
             } else if (command.equals("Properties")) {
-                selectedWindow = 1;
-                if (vertexList.size() > 0) {
-                    int[][] matrix = gP.generateAdjacencyMatrix(vertexList, edgeList);
-
-                    gP.vertexConnectivity(vertexList);
-                    gP.edgeConnectivity(vertexList, edgeList);
-
-                    for (Vertex v : vertexList) v.wasClicked = false;
-                    for (Edge ed : edgeList)    ed.wasClicked = false;
-
-                    for (Vertex v : gP.witnessVertices) v.wasClicked = true;
-                    for (Edge ed : gP.witnessEdges)     ed.wasClicked = true;
-
-                    reloadVertexConnections(matrix, vertexList);
-
-                    gP.generateDistanceMatrix(vertexList);
-                    gP.displayContainers(vertexList);
-                }
-
-                refreshPropertiesScrollSize();
-                frame.setContentPane(propertiesScroll);
-                frame.revalidate();
-                frame.repaint();
+                tabs.setSelectedIndex(1);
+            } else if (command.equals("About")) {
+                showAbout();
             }
 
             refresh();
@@ -1081,6 +1096,7 @@ public class Canvas {
         if (propertiesContent != null) {
             propertiesContent.repaint();
         }
+        updateStatus();
     }
 
     /** Pushes the walk highlight and step labels onto the edges before drawing. */
@@ -1124,7 +1140,7 @@ public class Canvas {
 
     public void setVisible(boolean visible) {
         if (graphic == null) {
-            Dimension size = canvas.getSize();
+            Dimension size = new Dimension(width, height);
             canvasImage = canvas.createImage(size.width, size.height);
             canvasImage2 = canvas.createImage(size.width, size.height);
             graphic = (Graphics2D) canvasImage.getGraphics();
@@ -1310,23 +1326,6 @@ public class Canvas {
         public void paint(Graphics g) {
             switch (selectedWindow) {
                 case 0: {
-                    String toolName;
-                    switch (selectedTool) {
-                        case 1: toolName = "Add Vertex"; break;
-                        case 2: toolName = "Add Edges"; break;
-                        case 3: toolName = "Grab Tool"; break;
-                        case 4: toolName = "Remove Tool"; break;
-                        case 5: toolName = "Add Directed Edge"; break;
-                        case 6: toolName = "Select Pair"; break;
-                        case 7: toolName = "Set Edge Weight"; break;
-                        case 8: toolName = "Mark as Root"; break;
-                        case 9: toolName = "Build Walk"; break;
-                        default: toolName = "None"; break;
-                    }
-                    graphic.drawString("Vertex Count=" + vertexList.size()
-                            + "  Edge Count=" + edgeList.size()
-                            + "  Selected Tool=" + toolName,
-                            50, height / 2 + (height * 2) / 5);
                     g.drawImage(canvasImage, 0, 0, null);
                     drawInfoBox(g);
                     drawPairInfoBox(g);
