@@ -3,9 +3,12 @@
 ## Vertex (Node)
 
 A point in the graph. Has a name, a canvas location, and three neighbor lists:
+
 - **undirectedNeighbors** — vertices connected by undirected edges
 - **inNeighbors** — vertices connected by directed edges pointing *into* this vertex
 - **outNeighbors** — vertices connected by directed edges pointing *out of* this vertex
+
+**Name** — a short label identifying the vertex: 1–4 characters from letters, digits and `_`, unique within the graph (case-sensitive, so `a` and `A` differ). New vertices are named `0`, `1`, `2`, … (lowest unused number); the user may rename them.
 
 ### Node Properties
 
@@ -38,6 +41,10 @@ A connection between two vertices. Every edge is either **directed** or **undire
 ## Graph
 
 A set of vertices and edges. This project supports **mixed graphs** — graphs containing both directed and undirected edges simultaneously.
+
+**Graph file** — a saved graph: its vertices (name, position, root) and edges (endpoints, direction, weight). It holds nothing derived or analytical — no cutpoints, coloring, walks or selected pair.
+
+**Unsaved changes** — any edit to what a graph file holds, including moving a vertex. Analysis (coloring, building walks, selecting a pair, viewing Properties) is never an unsaved change.
 
 ---
 
