@@ -733,7 +733,7 @@ public class Canvas {
      */
     private void findTraversal(String kind) {
         selectedTool = Tools.WALK;
-        palette.setSelectedTool(tool 7);
+        palette.setSelectedTool(Tools.WALK);
         tabs.setSelectedIndex(0);
         clearWalk();
         if (kind.startsWith("Hamiltonian") && Traversals.hamiltonTooLarge(vertexList)) {
