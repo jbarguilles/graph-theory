@@ -106,7 +106,7 @@ public class GraphFileTest {
 
     @Test
     public void read_ignoresAUtf8ByteOrderMark() throws Exception {
-        GraphFile.Data d = GraphFile.read("﻿graph-theory 1\nvertex a 1 2\n");
+        GraphFile.Data d = GraphFile.read((char) 0xFEFF + "graph-theory 1\nvertex a 1 2\n");
         assertEquals(1, d.vertices.size());
         assertEquals("a", d.vertices.get(0).name);
     }

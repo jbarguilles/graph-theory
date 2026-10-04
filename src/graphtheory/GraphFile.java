@@ -58,7 +58,7 @@ public final class GraphFile {
     }
 
     public static Data read(String text) throws FormatException {
-        if (text.startsWith("﻿")) text = text.substring(1);
+        if (!text.isEmpty() && text.charAt(0) == 0xFEFF) text = text.substring(1);   // UTF-8 byte order mark
         Data data = new Data();
         Map<String, Vertex> byName = new HashMap<String, Vertex>();
         Map<Vertex, Integer> rootLine = new HashMap<Vertex, Integer>();
