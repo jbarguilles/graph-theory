@@ -35,7 +35,7 @@ public class Canvas {
     private int selectedTool;
     private int selectedWindow;
     public int width,  height;
-    private int clickedVertexIndex;
+    private int clickedVertexIndex = -1;
     private int clickedEdgeIndex;
     private int pairedVertex1Index = -1;
     private int pairedVertex2Index = -1;
@@ -260,7 +260,7 @@ public class Canvas {
         vertexList = vs;
         edgeList = es;
         clearWalk();
-        clickedVertexIndex = 0;
+        clickedVertexIndex = -1;
         pairedVertex1Index = -1;
         pairedVertex2Index = -1;
         currentPairVP = null;
@@ -994,6 +994,12 @@ public class Canvas {
             refresh();
         }
 
+        /** The vertex the current press started on, or null (pressed on empty space, or it was removed). */
+        private Vertex pressedVertex() {
+            return clickedVertexIndex >= 0 && clickedVertexIndex < vertexList.size()
+                    ? vertexList.get(clickedVertexIndex) : null;
+        }
+
         @Override
         public void mousePressed(MouseEvent e) {
             if (selectedWindow == 0) pressBefore = snapshot();
@@ -1001,6 +1007,7 @@ public class Canvas {
                 switch (selectedTool) {
                     case 2:
                     case 5: {
+                        clickedVertexIndex = -1;
                         for (Vertex v : vertexList) {
                             if (v.hasIntersection(e.getX(), e.getY())) {
                                 v.wasClicked = true;
@@ -1013,6 +1020,7 @@ public class Canvas {
                     }
                     case 3: {
                         boolean hitAny = false;
+                        clickedVertexIndex = -1;
                         for (Vertex v : vertexList) {
                             if (v.hasIntersection(e.getX(), e.getY())) {
                                 v.wasClicked = !v.wasClicked;
@@ -1034,10 +1042,13 @@ public class Canvas {
 
         @Override
         public void mouseReleased(MouseEvent e) {
+            String before = pressBefore;
+            pressBefore = null;
             if (selectedWindow == 0 && vertexList.size() > 0) {
                 switch (selectedTool) {
                     case 2: {
-                        Vertex parentV = vertexList.get(clickedVertexIndex);
+                        Vertex parentV = pressedVertex();
+                        if (parentV == null) break;
                         boolean addedAny = false;
                         for (Vertex v : vertexList) {
                             if (!v.hasIntersection(e.getX(), e.getY())) {
@@ -1073,7 +1084,8 @@ public class Canvas {
                         break;
                     }
                     case 5: {
-                        Vertex parentV = vertexList.get(clickedVertexIndex);
+                        Vertex parentV = pressedVertex();
+                        if (parentV == null) break;
                         boolean addedAny = false;
                         for (Vertex v : vertexList) {
                             if (!v.hasIntersection(e.getX(), e.getY())) {
@@ -1107,10 +1119,7 @@ public class Canvas {
                     }
                 }
             }
-            if (pressBefore != null) {
-                afterEdit(pressBefore);
-                pressBefore = null;
-            }
+            if (before != null) afterEdit(before);
             updateHover(e.getX(), e.getY());
             refresh();
         }
@@ -1122,17 +1131,19 @@ public class Canvas {
                     case 2:
                     case 5: {
                         refresh();
-                        graphic.setColor(Color.RED);
-                        drawLine(vertexList.get(clickedVertexIndex).location.x,
-                                 vertexList.get(clickedVertexIndex).location.y,
-                                 e.getX(), e.getY());
+                        Vertex from = pressedVertex();
+                        if (from != null) {
+                            graphic.setColor(Color.RED);
+                            drawLine(from.location.x, from.location.y, e.getX(), e.getY());
+                        }
                         canvas.repaint();
                         return;
                     }
                     case 3: {
-                        if (vertexList.get(clickedVertexIndex).wasClicked) {
-                            vertexList.get(clickedVertexIndex).location.x = e.getX();
-                            vertexList.get(clickedVertexIndex).location.y = e.getY();
+                        Vertex grabbed = pressedVertex();
+                        if (grabbed != null && grabbed.wasClicked) {
+                            grabbed.location.x = e.getX();
+                            grabbed.location.y = e.getY();
                         }
                         break;
                     }
