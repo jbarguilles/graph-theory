@@ -22,7 +22,7 @@ A point in the graph. Has a name, a canvas location, and three neighbor lists:
 
 **Cutpoint** (articulation point) — a vertex whose removal increases the number of connected components. Computed using Tarjan's DFS algorithm, treating all edges as undirected. Stored as `isCutpoint` on the vertex. Recomputed only when the Properties window is opened.
 
-**Root** — a user-designated vertex within a rooted tree or forest. At most one root per connected component. Stored as `isRoot` on the vertex.
+**Root** — a user-designated vertex within a rooted tree or forest. At most one root per connected component. Stored as `isRoot` on the vertex. When a new edge joins two components that each have a root, the root of the component the edge starts from (the drag's first vertex) stays; the other stops being a root.
 
 **Self-loop** — an edge whose two endpoints are the same vertex. A self-loop contributes 2 to the vertex's degree (undirected) or 1 each to in-degree and out-degree (directed).
 

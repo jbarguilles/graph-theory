@@ -88,7 +88,8 @@ public class GraphFileTest {
                                 "vertex b 10 20",
                                 "vertex c",
                                 "edge a b",
-                                "arc c a 7");
+                                "arc c a 7",
+                                "arc b c");
         assertEquals(3, d.vertices.size());
         assertEquals(2, d.unplaced.size());
         assertSame(d.vertices.get(0), d.unplaced.get(0));
@@ -99,6 +100,15 @@ public class GraphFileTest {
         assertEquals(1, d.edges.get(0).weight);
         assertTrue(d.edges.get(1).directed);
         assertEquals(7, d.edges.get(1).weight);
+        assertTrue(d.edges.get(2).directed);
+        assertEquals(1, d.edges.get(2).weight);
+    }
+
+    @Test
+    public void read_ignoresAUtf8ByteOrderMark() throws Exception {
+        GraphFile.Data d = GraphFile.read("﻿graph-theory 1\nvertex a 1 2\n");
+        assertEquals(1, d.vertices.size());
+        assertEquals("a", d.vertices.get(0).name);
     }
 
     @Test

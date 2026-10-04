@@ -466,6 +466,14 @@ public class Canvas {
         return visited;
     }
 
+    /** The root of start's connected component, or null. */
+    private Vertex rootOf(Vertex start) {
+        for (Vertex v : connectedComponentOf(start)) {
+            if (v.isRoot) return v;
+        }
+        return null;
+    }
+
     private Vector<Vector> buildInducedSubgraph() {
         Vector<Vertex> selV = new Vector<Vertex>();
         for (Vertex v : vertexList) {
@@ -825,6 +833,8 @@ public class Canvas {
                                 continue;
                             }
 
+                            Vertex keptRoot = rootOf(parentV);
+                            Vertex otherRoot = rootOf(v);
                             Edge edge = new Edge(v, parentV, false);
                             v.addUndirectedNeighbor(parentV);
                             if (v != parentV) {
@@ -833,6 +843,7 @@ public class Canvas {
                             v.wasClicked = false;
                             parentV.wasClicked = false;
                             edgeList.add(edge);
+                            if (keptRoot != null && otherRoot != null && keptRoot != otherRoot) otherRoot.isRoot = false;
                             addedAny = true;
                         }
                         if (addedAny) markGraphDirty();
@@ -854,12 +865,15 @@ public class Canvas {
                                 continue;
                             }
 
+                            Vertex keptRoot = rootOf(parentV);
+                            Vertex otherRoot = rootOf(v);
                             Edge edge = new Edge(parentV, v, true);
                             parentV.outNeighbors.add(v);
                             v.inNeighbors.add(parentV);
                             parentV.wasClicked = false;
                             v.wasClicked = false;
                             edgeList.add(edge);
+                            if (keptRoot != null && otherRoot != null && keptRoot != otherRoot) otherRoot.isRoot = false;
                             addedAny = true;
                         }
                         if (addedAny) markGraphDirty();

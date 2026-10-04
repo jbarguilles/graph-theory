@@ -58,6 +58,7 @@ public final class GraphFile {
     }
 
     public static Data read(String text) throws FormatException {
+        if (text.startsWith("﻿")) text = text.substring(1);
         Data data = new Data();
         Map<String, Vertex> byName = new HashMap<String, Vertex>();
         Map<Vertex, Integer> rootLine = new HashMap<Vertex, Integer>();
