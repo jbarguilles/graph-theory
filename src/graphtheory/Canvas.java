@@ -276,6 +276,7 @@ public class Canvas {
         pairedVertex2Index = -1;
         currentPairVP = null;
         pairPaths = null;
+        pressBefore = null;
         markGraphDirty();
         if (selectedWindow == 1) computeProperties();
     }
