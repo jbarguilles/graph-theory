@@ -1,130 +1,56 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package graphtheory;
 
-import java.awt.Point;
-import java.io.BufferedWriter;
+import java.awt.Component;
 import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.util.Scanner;
-import java.util.Vector;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import javax.swing.JFileChooser;
+import javax.swing.JOptionPane;
+import javax.swing.filechooser.FileNameExtensionFilter;
 
-/**
- *
- * @author mk
- */
+/** File dialogs and disk access for .graph files. The format itself is GraphFile. */
 public class FileManager {
 
-    public JFileChooser jF;
+    public static final String EXTENSION = "graph";
+
+    private final JFileChooser chooser = new JFileChooser();
 
     public FileManager() {
-        jF = new JFileChooser();
+        chooser.setFileFilter(new FileNameExtensionFilter("Graph files (*.graph)", EXTENSION));
     }
 
-    public void saveFile(Vector<Vertex> vList, Vector<Edge> eList, File fName) {
-        try {
-            BufferedWriter out = new BufferedWriter(new FileWriter(fName));
+    /** The file to open, or null if the user cancelled. */
+    public File chooseOpen(Component parent) {
+        return chooser.showOpenDialog(parent) == JFileChooser.APPROVE_OPTION
+                ? chooser.getSelectedFile() : null;
+    }
 
-            out.write("" + vList.size());
-            out.newLine();
-            for (Vertex v : vList) {
-                out.write(v.name);
-                out.newLine();
-            }
-            for (int i = 0; i < vList.size(); i++) {
-                for (int j = 0; j < vList.size(); j++) {
-                    if (vList.get(i).connectedToVertex(vList.get(j))) {
-                        out.write("1");
-                    } else {
-                        out.write("0");
-                    }
-                }
-                out.newLine();
-            }
-            for (int k = 0; k < vList.size(); k++) {
-                out.write(vList.get(k).location.x + "," + vList.get(k).location.y);
-                out.newLine();
-            }
-
-            // Weights section (in edgeList order)
-            out.write("" + eList.size());
-            out.newLine();
-            for (Edge ed : eList) {
-                out.write("" + ed.weight);
-                out.newLine();
-            }
-
-            out.close();
-
-        } catch (IOException e) {
-            System.out.println(e);
+    /** The file to save to (".graph" added if missing, overwrite confirmed), or null if cancelled. */
+    public File chooseSave(Component parent, File current) {
+        chooser.setSelectedFile(current != null ? current : new File("untitled." + EXTENSION));
+        while (true) {
+            if (chooser.showSaveDialog(parent) != JFileChooser.APPROVE_OPTION) return null;
+            File f = withExtension(chooser.getSelectedFile());
+            if (!f.exists()) return f;
+            int answer = JOptionPane.showConfirmDialog(parent,
+                    f.getName() + " already exists. Replace it?", "Confirm Save As",
+                    JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+            if (answer == JOptionPane.YES_OPTION) return f;
         }
     }
 
-    public Vector<Vector> loadFile(File fName) {
-        Vector<Vertex> vertexList = new Vector<Vertex>();
-        Vector<Edge> edgeList = new Vector<Edge>();
-        Vector<Vector> file = new Vector<Vector>();
-        try {
-            FileReader f = new FileReader(fName.toString());
-            Scanner data = new Scanner(f);
-            if (data.hasNext()) {
-                int size = Integer.parseInt(data.nextLine());
-                for (int i = 0; i < size; i++) {
-                    Vertex v = new Vertex(data.nextLine(), 0, 0);
-                    vertexList.add(v);
-                }
+    /** Adds ".graph" unless the name already has an extension. */
+    static File withExtension(File f) {
+        String name = f.getName();
+        return name.contains(".") ? f : new File(f.getParentFile(), name + "." + EXTENSION);
+    }
 
-                for (int j = 0; j < vertexList.size(); j++) {
-                    String adjacencyLine = data.nextLine();
-                    System.out.println(adjacencyLine);
-                    for (int k = 0; k < vertexList.size(); k++) {
-                        if (adjacencyLine.charAt(k) == '1') {
-                            vertexList.get(j).addUndirectedNeighbor(vertexList.get(k));
-                        }
-                    }
+    public static String read(File f) throws IOException {
+        return new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
+    }
 
-                    for (int l = j + 1; l < vertexList.size(); l++) {
-                        if (adjacencyLine.charAt(l) == '1') {
-                            Edge e = new Edge(vertexList.get(j), vertexList.get(l), false);
-                            edgeList.add(e);
-                        }
-                    }
-                }
-
-                if (data.hasNextLine()) {
-                    for (Vertex v : vertexList) {
-                        String pos = data.nextLine();
-                        v.location = new Point(Integer.parseInt(pos.split(",")[0]),
-                                               Integer.parseInt(pos.split(",")[1]));
-                    }
-                }
-
-                // Optional weights section (tolerates old files without it)
-                if (data.hasNextLine()) {
-                    String edgeCountLine = data.nextLine().trim();
-                    if (!edgeCountLine.isEmpty()) {
-                        int edgeCount = Integer.parseInt(edgeCountLine);
-                        for (int i = 0; i < edgeCount && i < edgeList.size(); i++) {
-                            if (!data.hasNextLine()) break;
-                            String wLine = data.nextLine().trim();
-                            if (!wLine.isEmpty()) {
-                                edgeList.get(i).weight = Integer.parseInt(wLine);
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (Exception e) {
-            System.out.println(e);
-        }
-        file.add(vertexList);
-        file.add(edgeList);
-        return file;
+    public static void write(File f, String text) throws IOException {
+        Files.write(f.toPath(), text.getBytes(StandardCharsets.UTF_8));
     }
 }

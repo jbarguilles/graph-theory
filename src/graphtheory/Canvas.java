@@ -11,6 +11,10 @@ import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+import java.io.File;
+import java.io.IOException;
 import java.awt.event.KeyEvent;
 import java.util.ArrayDeque;
 import java.util.HashSet;
@@ -37,6 +41,9 @@ public class Canvas {
     private int pairedVertex2Index = -1;
     private VertexPair currentPairVP = null;
     private FileManager fileManager = new FileManager();
+    private File currentFile = null;
+    private String savedText;
+    private String pressBefore = null;
     private final String appName;
     private final MenuListener menuListener = new MenuListener();
     private JTabbedPane tabs;
@@ -71,8 +78,16 @@ public class Canvas {
         vertexList = new Vector<Vertex>();
         edgeList = new Vector<Edge>();
 
+        savedText = snapshot();
+
         frame = new JFrame(appName);
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
+        frame.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                exitApp();
+            }
+        });
         frame.setResizable(false);
 
         canvas = new CanvasPane();
@@ -124,14 +139,20 @@ public class Canvas {
         frame.setLocationRelativeTo(null);
         setVisible(true);        // creates the canvas image, so it must come before refresh()
         selectTool(Tools.VERTEX);
+        updateTitle();
     }
 
     private void buildMenuBar() {
         JMenuBar bar = new JMenuBar();
 
         JMenu file = new JMenu("File");
-        addItem(file, "Open File", KeyStroke.getKeyStroke(KeyEvent.VK_O, KeyEvent.CTRL_DOWN_MASK));
-        addItem(file, "Save to File", KeyStroke.getKeyStroke(KeyEvent.VK_S, KeyEvent.CTRL_DOWN_MASK));
+        addItem(file, "New", KeyStroke.getKeyStroke(KeyEvent.VK_N, KeyEvent.CTRL_DOWN_MASK));
+        addItem(file, "Open...", KeyStroke.getKeyStroke(KeyEvent.VK_O, KeyEvent.CTRL_DOWN_MASK));
+        addItem(file, "Save", KeyStroke.getKeyStroke(KeyEvent.VK_S, KeyEvent.CTRL_DOWN_MASK));
+        addItem(file, "Save As...", KeyStroke.getKeyStroke(KeyEvent.VK_S,
+                KeyEvent.CTRL_DOWN_MASK | KeyEvent.SHIFT_DOWN_MASK));
+        file.addSeparator();
+        addItem(file, "Exit", null);
 
         JMenu edit = new JMenu("Edit");
         addItem(edit, "Remove All", null);
@@ -206,6 +227,134 @@ public class Canvas {
         clearHover();
         if (selectedWindow == 1) computeProperties();
         refresh();
+    }
+
+    /** The graph as .graph text: the unit of undo, saving and "unsaved changes". */
+    private String snapshot() {
+        return GraphFile.write(vertexList, edgeList);
+    }
+
+    /** Call after an edit with the snapshot from before it. */
+    private void afterEdit(String before) {
+        if (!before.equals(snapshot())) {
+            markGraphDirty();
+            if (selectedWindow == 1) computeProperties();
+        }
+        updateTitle();
+    }
+
+    private boolean isModified() {
+        return !snapshot().equals(savedText);
+    }
+
+    private String documentName() {
+        return currentFile == null ? "Untitled" : currentFile.getName();
+    }
+
+    private void updateTitle() {
+        frame.setTitle(documentName() + (isModified() ? "*" : "") + " \u2014 " + appName);
+    }
+
+    /** Swaps in a whole new graph (New, Open, Remove All, undo); clears analysis state. */
+    private void replaceGraph(Vector<Vertex> vs, Vector<Edge> es) {
+        vertexList = vs;
+        edgeList = es;
+        clearWalk();
+        clickedVertexIndex = 0;
+        pairedVertex1Index = -1;
+        pairedVertex2Index = -1;
+        currentPairVP = null;
+        pairPaths = null;
+        markGraphDirty();
+        if (selectedWindow == 1) computeProperties();
+    }
+
+    /** Offers to save unsaved changes before `action`; false means the user cancelled. */
+    private boolean confirmDiscard(String action) {
+        if (!isModified()) return true;
+        Object[] options = { "Save", "Don't Save", "Cancel" };
+        int choice = JOptionPane.showOptionDialog(frame,
+                "Save changes to " + documentName() + " before " + action + "?",
+                appName, JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE,
+                null, options, options[0]);
+        if (choice == 0) return save();
+        return choice == 1;
+    }
+
+    private void newGraph() {
+        if (!confirmDiscard("starting a new graph")) return;
+        replaceGraph(new Vector<Vertex>(), new Vector<Edge>());
+        currentFile = null;
+        savedText = snapshot();
+        tabs.setSelectedIndex(0);
+        updateTitle();
+    }
+
+    private void openGraph() {
+        if (!confirmDiscard("opening another file")) return;
+        File f = fileManager.chooseOpen(frame);
+        if (f == null) return;
+        GraphFile.Data d;
+        try {
+            d = GraphFile.read(FileManager.read(f));
+        } catch (IOException | GraphFile.FormatException ex) {
+            showError("Couldn't open " + f.getName(), ex.getMessage());
+            return;
+        }
+        String asWritten = GraphFile.write(d.vertices, d.edges);
+        Layout.arrangeOnCircle(d.unplaced, width, height);
+        Layout.clampInto(d.vertices, width, height);
+        replaceGraph(d.vertices, d.edges);
+        currentFile = f;
+        // If arranging or clamping moved anything, the graph now differs from the file: unsaved changes.
+        savedText = asWritten;
+        tabs.setSelectedIndex(0);
+        updateTitle();
+    }
+
+    /** Saves to the current file, or asks for one; false if cancelled or failed. */
+    private boolean save() {
+        return currentFile == null ? saveAs() : writeTo(currentFile);
+    }
+
+    private boolean saveAs() {
+        File f = fileManager.chooseSave(frame, currentFile);
+        return f != null && writeTo(f);
+    }
+
+    private boolean writeTo(File f) {
+        String text = snapshot();
+        try {
+            FileManager.write(f, text);
+        } catch (IOException ex) {
+            showError("Couldn't save " + f.getName(), ex.getMessage());
+            return false;
+        }
+        currentFile = f;
+        savedText = text;
+        updateTitle();
+        return true;
+    }
+
+    private void exitApp() {
+        if (!confirmDiscard("closing")) return;
+        frame.dispose();
+        System.exit(0);
+    }
+
+    private void removeAll() {
+        if (vertexList.isEmpty()) return;
+        int answer = JOptionPane.showConfirmDialog(frame,
+                "Remove all " + vertexList.size() + " vertices and " + edgeList.size() + " edges?",
+                "Remove All", JOptionPane.OK_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE);
+        if (answer != JOptionPane.OK_OPTION) return;
+        String before = snapshot();
+        replaceGraph(new Vector<Vertex>(), new Vector<Edge>());
+        afterEdit(before);
+    }
+
+    private void showError(String title, String message) {
+        JOptionPane.showMessageDialog(frame, message, title, JOptionPane.ERROR_MESSAGE);
     }
 
     /** Recomputes what the Properties tab shows. */
@@ -636,6 +785,13 @@ public class Canvas {
 
         @Override
         public void mouseClicked(MouseEvent e) {
+            if (selectedWindow != 0) return;
+            String before = snapshot();
+            handleClick(e);
+            afterEdit(before);
+        }
+
+        private void handleClick(MouseEvent e) {
             if (selectedWindow == 0) {
                 switch (selectedTool) {
                     case 1: {
@@ -840,6 +996,7 @@ public class Canvas {
 
         @Override
         public void mousePressed(MouseEvent e) {
+            if (selectedWindow == 0) pressBefore = snapshot();
             if (selectedWindow == 0 && vertexList.size() > 0) {
                 switch (selectedTool) {
                     case 2:
@@ -950,6 +1107,10 @@ public class Canvas {
                     }
                 }
             }
+            if (pressBefore != null) {
+                afterEdit(pressBefore);
+                pressBefore = null;
+            }
             updateHover(e.getX(), e.getY());
             refresh();
         }
@@ -1001,7 +1162,9 @@ public class Canvas {
             if (command.startsWith("Find ")) {
                 findTraversal(command.substring("Find ".length()));
             } else if (command.equals("Auto Arrange Vertices")) {
+                String before = snapshot();
                 arrangeVertices();
+                afterEdit(before);
             } else if (command.equals("Show Induced Subgraph")) {
                 Vector<Vector> sub = buildInducedSubgraph();
                 if (sub == null) {
@@ -1017,30 +1180,17 @@ public class Canvas {
             } else if (command.equals("Clear Coloring")) {
                 gP.clearColoring(vertexList);
             } else if (command.equals("Remove All")) {
-                edgeList.removeAllElements();
-                vertexList.removeAllElements();
-                clickedVertexIndex = 0;
-                pairedVertex1Index = -1;
-                pairedVertex2Index = -1;
-                currentPairVP = null;
-                clearWalk();
-                markGraphDirty();
-            } else if (command.equals("Open File")) {
-                int returnValue = fileManager.jF.showOpenDialog(frame);
-                if (returnValue == JFileChooser.APPROVE_OPTION) {
-                    clearWalk();
-                    pairedVertex1Index = -1;
-                    pairedVertex2Index = -1;
-                    currentPairVP = null;
-                    pairPaths = null;
-                    loadFile(fileManager.loadFile(fileManager.jF.getSelectedFile()));
-                    tabs.setSelectedIndex(0);
-                }
-            } else if (command.equals("Save to File")) {
-                int returnValue = fileManager.jF.showSaveDialog(frame);
-                if (returnValue == JFileChooser.APPROVE_OPTION) {
-                    fileManager.saveFile(vertexList, edgeList, fileManager.jF.getSelectedFile());
-                }
+                removeAll();
+            } else if (command.equals("New")) {
+                newGraph();
+            } else if (command.equals("Open...")) {
+                openGraph();
+            } else if (command.equals("Save")) {
+                save();
+            } else if (command.equals("Save As...")) {
+                saveAs();
+            } else if (command.equals("Exit")) {
+                exitApp();
             } else if (command.equals("Graph")) {
                 tabs.setSelectedIndex(0);
             } else if (command.equals("Properties")) {
@@ -1070,13 +1220,6 @@ public class Canvas {
                 }
             }
         }
-    }
-
-    private void loadFile(Vector<Vector> File) {
-        vertexList = File.firstElement();
-        edgeList = File.lastElement();
-        markGraphDirty();
-        refresh();
     }
 
     public void refresh() {
