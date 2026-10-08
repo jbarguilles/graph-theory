@@ -86,17 +86,81 @@ public class SummaryTextTest {
     }
 
     @Test
-    public void html_escapesNothingSurprising_andHasHeadings() {
+    public void html_hasSectionHeadingsAndRows() {
         String html = SummaryText.html(SummaryText.sections(new PropertiesReport(vs(a), es(), null)));
         assertTrue(html.contains("<h3>Size and order</h3>"));
-        assertTrue(html.contains("Order"));
+        assertTrue(html.contains("<tr><td valign='top'><b>Order</b></td><td>1</td></tr>"));
     }
 
     @Test
     public void emptyGraph_everyDashGivesAReason() {
         for (SummaryText.Section s : SummaryText.sections(new PropertiesReport(vs(), es(), null)))
             for (String[] l : s.lines) {
-                assertNotEquals(l[0], "\u2014", l[1]);
+                if (l[1].startsWith("\u2014"))
+                    assertTrue(l[0] + " = " + l[1], l[1].matches("\u2014 \\(.+\\)"));
             }
+    }
+
+    private static List<Vertex> cycleVertices(int n) {
+        List<Vertex> out = new Vector<Vertex>();
+        for (int i = 0; i < n; i++) out.add(v("v" + i));
+        return out;
+    }
+
+    private static List<Edge> cycleEdges(List<Vertex> vs) {
+        List<Edge> out = new Vector<Edge>();
+        for (int i = 0; i < vs.size(); i++) out.add(und(vs.get(i), vs.get((i + 1) % vs.size())));
+        return out;
+    }
+
+    private static Vector<Vertex> prefs(Vertex... xs) { return new Vector<Vertex>(Arrays.asList(xs)); }
+
+    @Test
+    public void completeBipartite_withLists_namesSidesAndProposer() {
+        Vertex d = v("d");
+        a.preferences = prefs(c, d);
+        b.preferences = prefs(c, d);
+        c.preferences = prefs(a, b);
+        d.preferences = prefs(a, b);
+        List<SummaryText.Section> ss = SummaryText.sections(new PropertiesReport(vs(a, b, c, d),
+                es(und(a, c), und(a, d), und(b, c), und(b, d)), null));
+        assertEquals("yes (K_{2,2}, sides {a, b} and {c, d})", line(ss, "Bipartite"));
+        String stable = line(ss, "Stable matching");
+        assertTrue(stable, stable.startsWith("2: "));
+        assertTrue(stable, stable.endsWith(" (side {a, b} proposes)"));
+    }
+
+    @Test
+    public void pathPlusIsolatedVertex_isAForestWithItsRoot() {
+        a.isRoot = true;
+        assertEquals("forest (2 trees; roots a)",
+                line(SummaryText.sections(new PropertiesReport(vs(a, b, c), es(und(a, b)), null)), "Tree"));
+    }
+
+    @Test
+    public void sixteenCycle_chromaticNumberIsCapped() {
+        List<Vertex> cyc = cycleVertices(16);
+        assertEquals("\u2014 (more than 15 vertices)", line(SummaryText.sections(
+                new PropertiesReport(cyc, cycleEdges(cyc), null)), "Chromatic number \u03c7(G)"));
+    }
+
+    @Test
+    public void twentyOneCycle_hamiltonAndMaximumMatchingAreCapped() {
+        List<Vertex> cyc = cycleVertices(21);
+        List<SummaryText.Section> ss = SummaryText.sections(new PropertiesReport(cyc, cycleEdges(cyc), null));
+        assertEquals("\u2014 (more than 20 vertices)", line(ss, "Hamiltonian path"));
+        assertEquals("\u2014 (more than 20 vertices)", line(ss, "Maximum matching"));
+    }
+
+    @Test
+    public void cutWording() {
+        List<SummaryText.Section> path = SummaryText.sections(new PropertiesReport(vs(a, b, c),
+                es(und(a, b), und(b, c)), null));
+        assertEquals("1 (minimum vertex cut: {b})", line(path, "Vertex connectivity \u03ba(G)"));
+        assertEquals("1 (minimum edge cut: the edge {a, b})", line(path, "Edge connectivity \u03bb(G)"));
+        List<SummaryText.Section> tri = SummaryText.sections(new PropertiesReport(vs(a, b, c),
+                es(und(a, b), und(b, c), und(c, a)), null));
+        String l = line(tri, "Edge connectivity \u03bb(G)");
+        assertTrue(l, l.startsWith("2 (minimum edge cut: the edges "));
     }
 }

@@ -2,6 +2,7 @@ package graphtheory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /** The Overview summary: titled sections of (label, value) lines (CONTEXT.md terms; yes/no). */
 public final class SummaryText {
@@ -55,7 +56,7 @@ public final class SummaryText {
         st.add("Simple", none ? NO_VERTICES : yesNo(r.simple));
         st.add("Empty", none ? NO_VERTICES : yesNo(r.empty));
         st.add("Complete", none ? NO_VERTICES : yesNo(r.complete));
-        st.add("Density", r.density != null ? String.format("%.2f", r.density)
+        st.add("Density", r.density != null ? String.format(Locale.ROOT, "%.2f", r.density)
                 : NONE + (n < 2 ? " (fewer than two vertices)" : " (not simple)"));
         st.add("Cyclic", none ? NO_VERTICES : yesNo(r.cyclic));
         st.add("Tree", none ? NO_VERTICES : treeLine(r));
@@ -139,6 +140,7 @@ public final class SummaryText {
             return NONE + " (no preference list: " + PanelText.join(names, ", ") + ")";
         }
         List<Vertex> side = r.sides.get(1).contains(r.proposer) ? r.sides.get(1) : r.sides.get(0);
+        if (r.stable == null) return NONE;
         return matching(r.stable) + " (side " + vertexSet(side) + " proposes)";
     }
 
