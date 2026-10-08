@@ -1,6 +1,7 @@
 package graphtheory;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,7 +30,10 @@ public class PreferenceEditor {
     public List<Vertex> vertices() { return vertices; }
 
     /** null = no list. */
-    public List<Vertex> listOf(Vertex v) { return lists.get(v); }
+    public List<Vertex> listOf(Vertex v) {
+        List<Vertex> l = lists.get(v);
+        return l == null ? null : Collections.unmodifiableList(l);
+    }
 
     /** A list of v's neighbours in the order of their first edge. */
     public void create(Vertex v) { lists.put(v, new ArrayList<Vertex>(PreferenceLists.neighboursOf(v, edges))); }

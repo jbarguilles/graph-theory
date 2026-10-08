@@ -50,4 +50,46 @@ public class PreferenceEditorTest {
         ed.apply();
         assertNull(a.preferences);
     }
+
+    @Test
+    public void createThenClear_isNoChange() {
+        PreferenceEditor ed = new PreferenceEditor(vs(a, b), es(und(a, b)));
+        ed.create(a);
+        ed.clear(a);
+        assertFalse(ed.changed());
+    }
+
+    @Test
+    public void moveUpThenDown_isNoChange() {
+        a.preferences = new Vector<Vertex>(Arrays.asList(b, c));
+        PreferenceEditor ed = new PreferenceEditor(vs(a, b, c), es(und(a, b), und(a, c)));
+        assertEquals(0, ed.moveUp(a, 1));
+        assertEquals(1, ed.moveDown(a, 0));
+        assertFalse(ed.changed());
+    }
+
+    @Test
+    public void noSelection_movesNothing() {
+        a.preferences = new Vector<Vertex>(Arrays.asList(b, c));
+        PreferenceEditor ed = new PreferenceEditor(vs(a, b, c), es(und(a, b), und(a, c)));
+        assertEquals(-1, ed.moveUp(a, -1));
+        assertEquals(-1, ed.moveDown(a, -1));
+        assertFalse(ed.changed());
+    }
+
+    @Test
+    public void moveDown_movesEntryDown() {
+        PreferenceEditor ed = new PreferenceEditor(vs(a, b, c), es(und(a, b), und(a, c)));
+        ed.create(a);
+        assertEquals(1, ed.moveDown(a, 0));
+        assertEquals(Arrays.asList(c, b), ed.listOf(a));
+        assertEquals(1, ed.moveDown(a, 1));
+    }
+
+    @Test
+    public void create_skipsSelfAndListsParallelNeighbourOnce() {
+        PreferenceEditor ed = new PreferenceEditor(vs(a, b), es(und(a, a), und(a, b), und(b, a)));
+        ed.create(a);
+        assertEquals(Arrays.asList(b), ed.listOf(a));
+    }
 }
