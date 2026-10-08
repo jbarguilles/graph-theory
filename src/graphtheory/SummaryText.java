@@ -6,7 +6,8 @@ import java.util.List;
 /** The Overview summary: titled sections of (label, value) lines (CONTEXT.md terms; yes/no). */
 public final class SummaryText {
 
-    public static final String NONE = "—";
+    public static final String NONE = "\u2014";
+    public static final String NO_VERTICES = NONE + " (no vertices)";
 
     private SummaryText() {}
 
@@ -34,42 +35,43 @@ public final class SummaryText {
         out.add(size);
 
         Section con = new Section("Connectivity");
-        con.add("Connected", none ? NONE : r.connected ? "yes" : "no (" + r.components.size() + " components)");
-        con.add("Components", none ? NONE : sets(r.components));
+        con.add("Connected", none ? NO_VERTICES : r.connected ? "yes" : "no (" + r.components.size() + " components)");
+        con.add("Components", none ? NO_VERTICES : sets(r.components));
         if (r.stronglyConnected != null) con.add("Strongly connected", yesNo(r.stronglyConnected));
         String kappa = "" + r.vertexCut.size;
-        if (!r.vertexCut.members.isEmpty()) kappa += " (minimum vertex cut " + vertexSet(r.vertexCut.members) + ")";
+        if (!r.vertexCut.members.isEmpty()) kappa += " (minimum vertex cut: " + vertexSet(r.vertexCut.members) + ")";
         else if (r.connected && n > 1) kappa += " (no vertex cut: every two vertices are adjacent)";
-        con.add("Vertex connectivity κ(G)", none ? NONE : kappa);
+        con.add("Vertex connectivity \u03ba(G)", none ? NO_VERTICES : kappa);
         String lambda = "" + r.edgeCut.size;
-        if (!r.edgeCut.members.isEmpty()) lambda += " (minimum edge cut " + edges(r.edgeCut.members, false) + ")";
-        con.add("Edge connectivity λ(G)", none ? NONE : lambda);
+        if (!r.edgeCut.members.isEmpty()) lambda += " (minimum edge cut: the edge" + (r.edgeCut.members.size() > 1 ? "s " : " ")
+                + edges(r.edgeCut.members, false) + ")";
+        con.add("Edge connectivity \u03bb(G)", none ? NO_VERTICES : lambda);
         List<Edge> bridges = new ArrayList<Edge>();
         for (Edge e : r.edges) if (r.bridges.contains(e)) bridges.add(e);
         con.add("Bridges", bridges.isEmpty() ? "0" : bridges.size() + ": " + edges(bridges, false));
         out.add(con);
 
         Section st = new Section("Structure");
-        st.add("Simple", none ? NONE : yesNo(r.simple));
-        st.add("Empty", none ? NONE : yesNo(r.empty));
-        st.add("Complete", none ? NONE : yesNo(r.complete));
+        st.add("Simple", none ? NO_VERTICES : yesNo(r.simple));
+        st.add("Empty", none ? NO_VERTICES : yesNo(r.empty));
+        st.add("Complete", none ? NO_VERTICES : yesNo(r.complete));
         st.add("Density", r.density != null ? String.format("%.2f", r.density)
                 : NONE + (n < 2 ? " (fewer than two vertices)" : " (not simple)"));
-        st.add("Cyclic", none ? NONE : r.cyclic ? "cyclic" : "acyclic");
-        st.add("Tree", none ? NONE : treeLine(r));
-        st.add("Star", none ? NONE : yesNo(r.star));
-        st.add("Bipartite", none ? NONE : bipartiteLine(r));
+        st.add("Cyclic", none ? NO_VERTICES : yesNo(r.cyclic));
+        st.add("Tree", none ? NO_VERTICES : treeLine(r));
+        st.add("Star", none ? NO_VERTICES : yesNo(r.star));
+        st.add("Bipartite", none ? NO_VERTICES : bipartiteLine(r));
         out.add(st);
 
         Section bl = new Section("Blocks");
-        bl.add("Nonseparable", none ? NONE : yesNo(r.nonseparable));
+        bl.add("Nonseparable", none ? NO_VERTICES : yesNo(r.nonseparable));
         int nontrivial = 0;
         List<List<Vertex>> blockSets = new ArrayList<List<Vertex>>();
         for (Blocks.Block b : r.blocks) {
             if (b.vertices.size() >= 3) nontrivial++;
             blockSets.add(b.vertices);
         }
-        bl.add("Blocks", none ? NONE : r.blocks.size() + " (" + nontrivial + " nontrivial): " + sets(blockSets));
+        bl.add("Blocks", none ? NO_VERTICES : r.blocks.size() + " (" + nontrivial + " nontrivial): " + sets(blockSets));
         out.add(bl);
 
         Section tr = new Section("Traversals");
@@ -81,14 +83,14 @@ public final class SummaryText {
         out.add(tr);
 
         Section cm = new Section("Colouring and matching");
-        cm.add("Chromatic number χ(G)", none ? NONE
+        cm.add("Chromatic number \u03c7(G)", none ? NO_VERTICES
                 : r.chromatic == Colouring.NO_PROPER_COLOURING ? NONE + " (self-loop)"
                 : r.chromatic == Colouring.TOO_LARGE ? NONE + " (more than " + Colouring.CAP + " vertices)"
                 : "" + r.chromatic);
-        cm.add("Maximal matching", none ? NONE : matching(r.maximal));
+        cm.add("Maximal matching", none ? NO_VERTICES : matching(r.maximal));
         String tooMany = NONE + " (more than " + Matchings.MAXIMUM_VERTEX_CAP + " vertices)";
-        cm.add("Maximum matching", none ? NONE : r.maximum == null ? tooMany : matching(r.maximum));
-        cm.add("Perfect matching", none ? NONE : r.maximum == null ? tooMany : yesNo(r.perfect));
+        cm.add("Maximum matching", none ? NO_VERTICES : r.maximum == null ? tooMany : matching(r.maximum));
+        cm.add("Perfect matching", none ? NO_VERTICES : r.maximum == null ? tooMany : yesNo(r.perfect));
         cm.add("Stable matching", stableLine(r));
         out.add(cm);
         return out;
@@ -129,7 +131,7 @@ public final class SummaryText {
     }
 
     private static String stableLine(PropertiesReport r) {
-        if (r.vertices.isEmpty()) return NONE;
+        if (r.vertices.isEmpty()) return NO_VERTICES;
         if (r.sides == null) return NONE + " (not bipartite)";
         if (!r.missingPreferences.isEmpty()) {
             List<String> names = new ArrayList<String>();

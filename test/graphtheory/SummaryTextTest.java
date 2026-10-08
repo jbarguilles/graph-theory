@@ -58,17 +58,17 @@ public class SummaryTextTest {
     @Test
     public void completeGraph_saysThereIsNoVertexCut() {
         String k = line(SummaryText.sections(new PropertiesReport(vs(a, b, c),
-                es(und(a, b), und(b, c), und(c, a)), null)), "Vertex connectivity κ(G)");
+                es(und(a, b), und(b, c), und(c, a)), null)), "Vertex connectivity \u03ba(G)");
         assertEquals("2 (no vertex cut: every two vertices are adjacent)", k);
     }
 
     @Test
     public void reasonsInBrackets() {
         List<SummaryText.Section> ss = SummaryText.sections(new PropertiesReport(vs(a, b), es(und(a, b), und(a, b)), null));
-        assertEquals("— (not simple)", line(ss, "Density"));
-        assertEquals("— (no preference list: a, b)", line(ss, "Stable matching"));
+        assertEquals("\u2014 (not simple)", line(ss, "Density"));
+        assertEquals("\u2014 (no preference list: a, b)", line(ss, "Stable matching"));
         List<SummaryText.Section> loop = SummaryText.sections(new PropertiesReport(vs(a), es(und(a, a)), null));
-        assertEquals("— (self-loop)", line(loop, "Chromatic number χ(G)"));
+        assertEquals("\u2014 (self-loop)", line(loop, "Chromatic number \u03c7(G)"));
         assertEquals("no (self-loop)", line(loop, "Bipartite"));
     }
 
@@ -90,5 +90,13 @@ public class SummaryTextTest {
         String html = SummaryText.html(SummaryText.sections(new PropertiesReport(vs(a), es(), null)));
         assertTrue(html.contains("<h3>Size and order</h3>"));
         assertTrue(html.contains("Order"));
+    }
+
+    @Test
+    public void emptyGraph_everyDashGivesAReason() {
+        for (SummaryText.Section s : SummaryText.sections(new PropertiesReport(vs(), es(), null)))
+            for (String[] l : s.lines) {
+                assertNotEquals(l[0], "\u2014", l[1]);
+            }
     }
 }
