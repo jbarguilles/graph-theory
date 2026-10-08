@@ -6,6 +6,7 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Polygon;
 import java.awt.Stroke;
+import java.util.List;
 
 public class Edge {
 
@@ -49,6 +50,14 @@ public class Edge {
 
     public boolean isSelfLoop() {
         return vertex1 == vertex2;
+    }
+
+    /** A weighted graph has at least one edge whose weight is not 1 (CONTEXT.md). */
+    public static boolean isWeighted(List<Edge> edges) {
+        for (Edge e : edges) {
+            if (e.weight != 1) return true;
+        }
+        return false;
     }
 
     /** True if a reverse directed edge vertex2 → vertex1 also exists. */
