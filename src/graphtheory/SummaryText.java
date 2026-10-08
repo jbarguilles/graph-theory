@@ -77,6 +77,7 @@ public final class SummaryText {
 
         Section tr = new Section("Traversals");
         String big = NONE + " (more than " + Traversals.HAMILTON_VERTEX_CAP + " vertices)";
+        tr.add("Tour", yesNo(r.tour));
         tr.add("Euler trail", yesNo(r.eulerTrail));
         tr.add("Euler tour", yesNo(r.eulerTour));
         tr.add("Hamiltonian path", r.hamiltonTooLarge ? big : yesNo(r.hamiltonianPath));

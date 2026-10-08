@@ -38,7 +38,7 @@ public final class PropertiesReport {
     public final boolean nonseparable;
 
     public final boolean hamiltonTooLarge;
-    public final boolean eulerTrail, eulerTour, hamiltonianPath, hamiltonianCycle;
+    public final boolean tour, eulerTrail, eulerTour, hamiltonianPath, hamiltonianCycle;
 
     /** Colouring.chromaticNumber's result, including its NO_PROPER_COLOURING / TOO_LARGE codes. */
     public final int chromatic;
@@ -88,6 +88,7 @@ public final class PropertiesReport {
 
         Vector<Vertex> vv = new Vector<Vertex>(vs);
         Vector<Edge> ev = new Vector<Edge>(es);
+        tour = Traversals.hasTour(vs, es);
         eulerTrail = Traversals.eulerTrail(vv, ev) != null;
         eulerTour = Traversals.eulerTour(vv, ev) != null;
         hamiltonTooLarge = Traversals.hamiltonTooLarge(vv);

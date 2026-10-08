@@ -156,7 +156,13 @@ _Avoid_: "distance" for the length of a particular walk — use **Length**.
 
 _Avoid_: "distance" or "geodesic" when the weight sum is meant — use **Weighted distance** and **Lightest path**.
 
-_Avoid_: "Tour" for a closed trail — use **Circuit**. "Tour" is reserved for an **Euler tour**.
+_Avoid_: "Tour" for a closed trail — use **Circuit**. A circuit need not cross every edge; a tour must.
+
+### Tour
+
+**Tour** — a closed walk that crosses every edge of the graph at least once. Edges may repeat. Like any walk it respects direction. Isolated vertices do not matter. A graph with no edges has no tour, since the trivial walk is not closed.
+
+An **Euler tour** is a tour that crosses every edge exactly once.
 
 ### Euler Trail and Euler Tour
 

@@ -61,6 +61,8 @@ public class SidePanel extends JPanel implements Scrollable {
         /** Red line in the Walk section, or null. */
         public String walkMessage;
         public boolean weighted;
+        /** The graph's edges, which a tour must all cross. */
+        public List<Edge> edges = Collections.emptyList();
     }
 
     private final Listener listener;
@@ -264,7 +266,7 @@ public class SidePanel extends JPanel implements Scrollable {
 
     private boolean showWalk(Content c) {
         String key = (c.walk == null ? "" : c.walk.toString() + '\u0000'
-                + PanelText.join(java.util.Arrays.asList(PanelText.walkFacts(c.walk, c.weighted)), "\n"))
+                + PanelText.join(java.util.Arrays.asList(PanelText.walkFacts(c.walk, c.weighted, c.edges)), "\n"))
                 + '\u0000' + c.foundKind + '\u0000' + c.walkMessage;
         if (key.equals(walkKey)) return false;
         walkKey = key;
@@ -276,7 +278,7 @@ public class SidePanel extends JPanel implements Scrollable {
         if (c.walk != null) {
             walkHeading.setText(PanelText.walkHeading(c.foundKind));
             walkText.setText(c.walk.toString());
-            walkFacts.setText(PanelText.join(java.util.Arrays.asList(PanelText.walkFacts(c.walk, c.weighted)), "\n"));
+            walkFacts.setText(PanelText.join(java.util.Arrays.asList(PanelText.walkFacts(c.walk, c.weighted, c.edges)), "\n"));
         }
         walkMessage.setVisible(c.walkMessage != null);
         walkMessage.setText(c.walkMessage == null ? "" : c.walkMessage);

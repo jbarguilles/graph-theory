@@ -1,6 +1,7 @@
 package graphtheory;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Vector;
 import org.junit.Test;
 import static org.junit.Assert.*;
@@ -100,9 +101,24 @@ public class PanelTextTest {
         Edge uv = und(u, v, 3);
         Walk w = new Walk(u);
         w.extend(uv);
-        assertEquals(Arrays.asList("Length: 1", "Kind: path", "Trail: yes   Path: yes",
-                "Closed: no   Circuit: no   Cycle: no"), Arrays.asList(PanelText.walkFacts(w, false)));
-        assertEquals("Weight: 3", PanelText.walkFacts(w, true)[1]);
+        List<Edge> graph = Arrays.asList(uv);
+        assertEquals(Arrays.asList("Length: 1", "Kind: path", "Closed: no", "Trail: yes   Path: yes"),
+                Arrays.asList(PanelText.walkFacts(w, false, graph)));
+        assertEquals("Weight: 3", PanelText.walkFacts(w, true, graph)[1]);
+    }
+
+    @Test
+    public void walkFacts_closedShowsCircuitCycleTourNotPath() {
+        Edge uv = und(u, v, 1), vu = und(v, u, 1), extra = und(u, v, 1);
+        Walk w = new Walk(u);
+        w.extend(uv);
+        w.extend(vu);
+        assertEquals(Arrays.asList("Length: 2", "Kind: cycle", "Closed: yes",
+                "Circuit: yes   Cycle: yes   Tour: yes"),
+                Arrays.asList(PanelText.walkFacts(w, false, Arrays.asList(uv, vu))));
+        // An edge the walk never crosses: still a cycle, but not a tour.
+        assertEquals("Circuit: yes   Cycle: yes   Tour: no",
+                PanelText.walkFacts(w, false, Arrays.asList(uv, vu, extra))[3]);
     }
 
     @Test
