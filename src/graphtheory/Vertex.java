@@ -79,12 +79,9 @@ public class Vertex implements Comparable {
 
     public int degree() {
         int d = 0;
-        boolean sawSelfLoop = false;
         for (Vertex v : undirectedNeighbors) {
-            if (v == this) sawSelfLoop = true;
-            else d++;
+            d += (v == this) ? 2 : 1;
         }
-        if (sawSelfLoop) d += 2;
         return d;
     }
 

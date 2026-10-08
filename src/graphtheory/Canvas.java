@@ -934,7 +934,7 @@ public class Canvas {
                                 b.inNeighbors.remove(a);
                             } else {
                                 a.undirectedNeighbors.remove(b);
-                                b.undirectedNeighbors.remove(a);
+                                if (a != b) b.undirectedNeighbors.remove(a);
                             }
                             if (currentWalk != null && currentWalk.uses(edgeVictim)) clearWalk();
                             edgeList.remove(edgeVictim);

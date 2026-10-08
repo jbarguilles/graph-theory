@@ -27,6 +27,15 @@ public class VertexTest {
     }
 
     @Test
+    public void degree_severalSelfLoops_eachCountsAsTwo() throws GraphFile.FormatException {
+        GraphFile.Data d = GraphFile.read("graph-theory 1\nvertex a 0 0\nvertex b 10 0\n"
+                + "edge a a\nedge a a\nedge a b\n");
+        Vertex a = d.vertices.get(0);
+        assertEquals(5, a.degree());
+        assertEquals(1, d.vertices.get(1).degree());
+    }
+
+    @Test
     public void degree_ignoresDirectedNeighbors() {
         Vertex v = new Vertex("v", 0, 0);
         v.inNeighbors.add(new Vertex("a", 0, 0));

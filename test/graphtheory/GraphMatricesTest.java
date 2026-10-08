@@ -25,6 +25,16 @@ public class GraphMatricesTest {
     private final Vertex a = v("a"), b = v("b"), c = v("c");
 
     @Test
+    public void adjacency_rowSumIsDegreePlusOutDegree_withSeveralLoops() throws GraphFile.FormatException {
+        GraphFile.Data d = GraphFile.read("graph-theory 1\nvertex a 0 0\nvertex b 10 0\n"
+                + "edge a a\nedge a a\nedge a b\narc a b\n");
+        int[][] m = GraphMatrices.adjacency(d.vertices, d.edges);
+        Vertex x = d.vertices.get(0);
+        assertEquals(x.degree() + x.outDegree(), m[0][0] + m[0][1]);
+        assertEquals(6, m[0][0] + m[0][1]);
+    }
+
+    @Test
     public void adjacency_countsEdges_rowToColumn() {
         int[][] m = GraphMatrices.adjacency(vs(a, b, c),
                 es(und(a, b), und(a, b), arc(b, c), und(a, a), arc(c, c)));
