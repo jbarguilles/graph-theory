@@ -122,4 +122,57 @@ public class EdgeShapesTest {
         Edge other = new Edge(a, b, false);
         assertEquals(0, shapes(listed).curve(other)[3], EPS);
     }
+
+    @Test
+    public void firstLoop_sitsAboveVertex() {
+        Vertex v = new Vertex("v", 100, 100);
+        Edge loop = new Edge(v, v, false);
+        double[] l = shapes(loop).loop(loop);
+        assertEquals(100, l[0], EPS);
+        assertEquals(EdgeShapes.LOOP_RADIUS, l[2], EPS);
+        // lowest point is just inside the vertex outline
+        assertEquals(100 - Vertex.RADIUS + 4, l[1] + l[2], EPS);
+    }
+
+    @Test
+    public void loops_nestWithTopsFourteenApart() {
+        Vertex v = new Vertex("v", 100, 100);
+        Edge l1 = new Edge(v, v, false);
+        Edge l2 = new Edge(v, v, true);
+        EdgeShapes s = shapes(l1, l2);
+        double top1 = s.loop(l1)[1] - s.loop(l1)[2];
+        double top2 = s.loop(l2)[1] - s.loop(l2)[2];
+        assertEquals(14, top1 - top2, EPS);
+    }
+
+    @Test
+    public void loops_onDifferentVertices_countSeparately() {
+        Vertex v = new Vertex("v", 100, 100);
+        Vertex w = new Vertex("w", 300, 100);
+        Edge lv = new Edge(v, v, false);
+        Edge lw = new Edge(w, w, false);
+        EdgeShapes s = shapes(lv, lw);
+        assertEquals(EdgeShapes.LOOP_RADIUS, s.loop(lw)[2], EPS);
+    }
+
+    @Test
+    public void nearest_picksTheNestedLoopClickedOn() {
+        Vertex v = new Vertex("v", 100, 100);
+        Edge l1 = new Edge(v, v, false);
+        Edge l2 = new Edge(v, v, false);
+        EdgeShapes s = shapes(l1, l2);
+        double[] o = s.loop(l2);
+        assertSame(l2, s.nearest(o[0], o[1] - o[2]));
+        double[] i = s.loop(l1);
+        assertSame(l1, s.nearest(i[0], i[1] - i[2]));
+    }
+
+    @Test
+    public void loopAndEdge_sameList_bothLaidOut() {
+        Edge ab = new Edge(a, b, false);
+        Edge loop = new Edge(a, a, false);
+        EdgeShapes s = shapes(ab, loop);
+        assertEquals(0, s.curve(ab)[3], EPS);
+        assertEquals(EdgeShapes.LOOP_RADIUS, s.loop(loop)[2], EPS);
+    }
 }

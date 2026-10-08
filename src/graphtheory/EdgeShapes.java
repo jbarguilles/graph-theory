@@ -19,10 +19,18 @@ public final class EdgeShapes {
     /** How close (pixels) a click must be to an edge to hit it. */
     public static final double TOLERANCE = 6.0;
 
+    /** Radius of the first self-loop on a vertex. */
+    public static final double LOOP_RADIUS = 12;
+    /** Each further loop on the same vertex is this much bigger in radius, so its top is twice this higher. */
+    public static final double LOOP_STEP = 7;
+    /** How far every loop's lowest point sits inside the vertex outline (hidden under the vertex). */
+    private static final double LOOP_SINK = 4;
+
     private static final int SAMPLES = 32;
 
     private final List<Edge> edges;
     private final Map<Edge, Double> fanOffset = new IdentityHashMap<Edge, Double>();
+    private final Map<Edge, Integer> loopIndex = new IdentityHashMap<Edge, Integer>();
 
     private EdgeShapes(List<Edge> edges) {
         this.edges = edges;
@@ -32,8 +40,15 @@ public final class EdgeShapes {
     public static EdgeShapes of(List<Edge> edges) {
         EdgeShapes s = new EdgeShapes(edges);
         Map<String, List<Edge>> pairs = new LinkedHashMap<String, List<Edge>>();
+        Map<Vertex, Integer> loopsOn = new IdentityHashMap<Vertex, Integer>();
         for (Edge e : edges) {
-            if (e.isSelfLoop()) continue;
+            if (e.isSelfLoop()) {
+                Integer count = loopsOn.get(e.vertex1);
+                int i = count == null ? 0 : count;
+                s.loopIndex.put(e, i);
+                loopsOn.put(e.vertex1, i + 1);
+                continue;
+            }
             String key = low(e).name + "\u0000" + high(e).name;
             List<Edge> group = pairs.get(key);
             if (group == null) {
@@ -81,6 +96,17 @@ public final class EdgeShapes {
         return new double[] { s[0], s[1], cx, cy, t[0], t[1] };
     }
 
+    /**
+     * A self-loop as a circle {centreX, centreY, radius}. All loops on a vertex share
+     * the same lowest point, so bigger ones nest around smaller ones.
+     */
+    public double[] loop(Edge e) {
+        Integer i = loopIndex.get(e);
+        double r = LOOP_RADIUS + LOOP_STEP * (i == null ? 0 : i);
+        double bottom = e.vertex1.location.y - Vertex.RADIUS + LOOP_SINK;
+        return new double[] { e.vertex1.location.x, bottom - r, r };
+    }
+
     /** The point on v's outline in the direction of (x, y). */
     private static double[] towards(Vertex v, double x, double y) {
         double dx = x - v.location.x, dy = y - v.location.y;
@@ -101,6 +127,10 @@ public final class EdgeShapes {
 
     /** Distance from (x, y) to the drawn edge. */
     public double distance(Edge e, double x, double y) {
+        if (e.isSelfLoop()) {
+            double[] l = loop(e);
+            return Math.abs(Math.hypot(x - l[0], y - l[1]) - l[2]);
+        }
         double[] c = curve(e);
         double best = Double.MAX_VALUE;
         for (int i = 0; i <= SAMPLES; i++) {
