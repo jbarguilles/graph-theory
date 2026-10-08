@@ -816,58 +816,11 @@ public class Canvas {
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
                 Graphics2D g2 = (Graphics2D) g;
-
                 g2.setColor(Color.WHITE);
                 g2.fillRect(0, 0, getWidth(), getHeight());
-
                 if (sV.isEmpty()) return;
-
-                int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE;
-                int maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE;
-                for (Vertex v : sV) {
-                    minX = Math.min(minX, v.location.x);
-                    minY = Math.min(minY, v.location.y);
-                    maxX = Math.max(maxX, v.location.x);
-                    maxY = Math.max(maxY, v.location.y);
-                }
-                int margin = 50;
-                int srcW = Math.max(1, maxX - minX);
-                int srcH = Math.max(1, maxY - minY);
-                double scale = Math.min(
-                        (getWidth()  - 2 * margin) / (double) srcW,
-                        (getHeight() - 2 * margin) / (double) srcH);
-                if (scale > 1.0) scale = 1.0;
-
-                g2.setColor(Color.BLACK);
-                for (Edge e : sE) {
-                    int x1 = (int) ((e.vertex1.location.x - minX) * scale) + margin;
-                    int y1 = (int) ((e.vertex1.location.y - minY) * scale) + margin;
-                    int x2 = (int) ((e.vertex2.location.x - minX) * scale) + margin;
-                    int y2 = (int) ((e.vertex2.location.y - minY) * scale) + margin;
-                    g2.drawLine(x1, y1, x2, y2);
-
-                    int mx = (x1 + x2) / 2;
-                    int my = (y1 + y2) / 2;
-                    g2.setColor(new Color(80, 80, 80));
-                    g2.drawString("" + e.weight, mx + 4, my - 4);
-                    g2.setColor(Color.BLACK);
-                }
-
-                int r = 30;
-                for (Vertex v : sV) {
-                    int cx = (int) ((v.location.x - minX) * scale) + margin;
-                    int cy = (int) ((v.location.y - minY) * scale) + margin;
-
-                    g2.setColor(Color.BLACK);
-                    g2.fillOval(cx - r / 2, cy - r / 2, r, r);
-                    g2.setColor(Color.WHITE);
-                    g2.fillOval(cx - r / 2 + 5, cy - r / 2 + 5, r - 10, r - 10);
-
-                    g2.setColor(Color.BLACK);
-                    FontMetrics fm = g2.getFontMetrics();
-                    int tw = fm.stringWidth(v.name);
-                    g2.drawString(v.name, cx - tw / 2, cy + 5);
-                }
+                g2.transform(GraphRenderer.fit(sV, getWidth(), getHeight(), 50));
+                GraphRenderer.paint(g2, sV, sE, new GraphRenderer.Options());
             }
         };
 
