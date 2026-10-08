@@ -80,4 +80,49 @@ public class BlocksTest {
         assertTrue(Blocks.isNonseparable(vs(a, b, c), es(und(a, b), und(b, c), arc(c, a))));
         assertFalse(Blocks.isNonseparable(vs(a, b), es()));
     }
+
+    @Test
+    public void blocksAreListedInVertexOrder_loopOnlyBlockFirst() {
+        List<Blocks.Block> bs = Blocks.blocks(vs(a, b, c), es(und(a, a), und(b, c)));
+        assertEquals(2, bs.size());
+        assertEquals(Arrays.asList(a), bs.get(0).vertices);
+        assertEquals(Arrays.asList(b, c), bs.get(1).vertices);
+    }
+
+    @Test
+    public void oppositeArcs_areNotBridges_andShareOneBlock() {
+        Edge ab = arc(a, b), ba = arc(b, a);
+        assertTrue(Blocks.bridges(vs(a, b), es(ab, ba)).isEmpty());
+        List<Blocks.Block> bs = Blocks.blocks(vs(a, b), es(ab, ba));
+        assertEquals(1, bs.size());
+        assertEquals(2, bs.get(0).edges.size());
+    }
+
+    @Test
+    public void loopOnVertexOfLargerBlock_joinsItWithoutChangingVertices() {
+        Edge loop = und(a, a);
+        List<Blocks.Block> bs = Blocks.blocks(vs(a, b), es(und(a, b), loop));
+        assertEquals(1, bs.size());
+        assertEquals(Arrays.asList(a, b), bs.get(0).vertices);
+        assertTrue(bs.get(0).edges.contains(loop));
+    }
+
+    @Test
+    public void nonseparable_moreCases() {
+        assertTrue(Blocks.isNonseparable(vs(a, b), es(und(a, b), und(a, b))));
+        assertTrue(Blocks.isNonseparable(vs(a), es(und(a, a))));
+        assertFalse(Blocks.isNonseparable(vs(), es()));
+    }
+
+    @Test
+    public void triangleWithPendantEdge() {
+        Edge pendant = und(c, d);
+        List<Vertex> v4 = vs(a, b, c, d);
+        List<Edge> e4 = es(und(a, b), und(b, c), und(c, a), pendant);
+        assertEquals(new java.util.HashSet<Edge>(Arrays.asList(pendant)), Blocks.bridges(v4, e4));
+        List<Blocks.Block> bs = Blocks.blocks(v4, e4);
+        assertEquals(2, bs.size());
+        assertEquals(Arrays.asList(a, b, c), bs.get(0).vertices);
+        assertEquals(Arrays.asList(c, d), bs.get(1).vertices);
+    }
 }

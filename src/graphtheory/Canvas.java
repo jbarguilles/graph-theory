@@ -660,7 +660,7 @@ public class Canvas {
         if (!graphDirty) return;
         if (vertexList.size() > 0) {
             gP.computeCutpoints(vertexList);
-            java.util.Set<Edge> bridges = Blocks.bridges(vertexList, edgeList);
+            Set<Edge> bridges = Blocks.bridges(vertexList, edgeList);
             for (Edge e : edgeList) e.isBridge = bridges.contains(e);
         } else {
             for (Vertex v : vertexList) v.isCutpoint = false;

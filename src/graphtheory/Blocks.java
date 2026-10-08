@@ -30,18 +30,14 @@ public final class Blocks {
 
     public static Set<Edge> bridges(List<Vertex> vs, List<Edge> es) {
         Tarjan t = new Tarjan(vs, es);
-        return t.bridges;
+        return Collections.unmodifiableSet(t.bridges);
     }
 
     /** Every block; isolated vertices are blocks of their own, and self-loops join a block of their vertex. */
     public static List<Block> blocks(List<Vertex> vs, List<Edge> es) {
         Tarjan t = new Tarjan(vs, es);
-        final Map<Vertex, Integer> idx = GraphMatrices.index(vs);
+        Map<Vertex, Integer> idx = GraphMatrices.index(vs);
         List<List<Edge>> edgeSets = new ArrayList<List<Edge>>(t.blocks);
-        // Order blocks by the smallest vertex index each contains (ties keep DFS order).
-        Collections.sort(edgeSets, new java.util.Comparator<List<Edge>>() {
-            public int compare(List<Edge> x, List<Edge> y) { return firstIndex(x, idx) - firstIndex(y, idx); }
-        });
         // Self-loops: into the first block holding their vertex, else a block of their own vertex.
         for (Edge e : es) {
             if (e.vertex1 != e.vertex2 || !idx.containsKey(e.vertex1)) continue;
@@ -66,6 +62,13 @@ public final class Blocks {
         for (Vertex v : vs) {
             if (!covered.contains(v)) out.add(new Block(Arrays.asList(v), new ArrayList<Edge>()));
         }
+        // Blocks come out ordered by their first vertex (stable: ties keep DFS order).
+        final Map<Vertex, Integer> order = idx;
+        Collections.sort(out, new java.util.Comparator<Block>() {
+            public int compare(Block x, Block y) {
+                return order.get(x.vertices.get(0)) - order.get(y.vertices.get(0));
+            }
+        });
         return out;
     }
 
@@ -77,12 +80,6 @@ public final class Blocks {
             for (Vertex v : b.vertices) if (!seen.add(v)) return false;
         }
         return true;
-    }
-
-    private static int firstIndex(List<Edge> set, Map<Vertex, Integer> idx) {
-        int m = Integer.MAX_VALUE;
-        for (Edge e : set) m = Math.min(m, Math.min(idx.get(e.vertex1), idx.get(e.vertex2)));
-        return m;
     }
 
     private static boolean touches(List<Edge> set, Vertex v) {
