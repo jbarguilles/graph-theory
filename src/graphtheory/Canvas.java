@@ -370,6 +370,7 @@ public class Canvas {
     private void replaceGraph(Vector<Vertex> vs, Vector<Edge> es) {
         vertexList = vs;
         edgeList = es;
+        reportKey = null;
         clearWalk();
         clickedVertexIndex = -1;
         pairFirst = null;
