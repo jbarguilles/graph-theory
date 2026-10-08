@@ -16,14 +16,14 @@ import java.util.Map;
 public final class EdgeShapes {
 
     /** Gap between neighbouring control points in a fan; the curves' midpoints end up half this apart. */
-    public static final double FAN_SPACING = 28;
+    public static final double FAN_SPACING = 40;
     /** How close (pixels) a click must be to an edge to hit it. */
     public static final double TOLERANCE = 6.0;
 
     /** Radius of the first self-loop on a vertex. */
     public static final double LOOP_RADIUS = 12;
     /** Each further loop on the same vertex is this much bigger in radius, so its top is twice this higher. */
-    public static final double LOOP_STEP = 7;
+    public static final double LOOP_STEP = 9;
     /** How far every loop's lowest point sits inside the vertex outline (hidden under the vertex). */
     private static final double LOOP_SINK = 4;
 

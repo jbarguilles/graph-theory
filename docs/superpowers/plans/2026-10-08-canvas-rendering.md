@@ -16,8 +16,8 @@
 
 | # | Decision |
 |---|---|
-| 1 | Non-loop edges are grouped by **unordered vertex pair**, whatever their direction. A group of *n* edges gives edge *i* (in `edgeList` order) the offset `(i − (n−1)/2) × FAN_SPACING`, along a perpendicular fixed for the pair (worked out from the endpoint with the smaller name to the other). One edge is straight. Antiparallel arcs are just a group of two. |
-| 2 | Self-loops on one vertex **nest**: all touch the same low point inside the vertex, radius grows 7px per loop, so the tops are 14px apart. Ordered by `edgeList`. |
+| 1 | (FAN_SPACING = 40, so neighbouring curves are 20px apart at the middle, more than a label box is tall.) Non-loop edges are grouped by **unordered vertex pair**, whatever their direction. A group of *n* edges gives edge *i* (in `edgeList` order) the offset `(i − (n−1)/2) × FAN_SPACING`, along a perpendicular fixed for the pair (worked out from the endpoint with the smaller name to the other). One edge is straight. Antiparallel arcs are just a group of two. |
+| 2 | Self-loops on one vertex **nest**: all touch the same low point inside the vertex, radius grows 9px per loop, so the tops are 18px apart (more than a label box is tall). Ordered by `edgeList`. |
 | 3 | Picking an edge chooses the **nearest** edge within tolerance, not the first one in the list. |
 | 4 | Rings: inner ring = cutpoint (orange) or isolated (grey); outer ring = root (green). Remove-hover (red) replaces both. |
 | 5 | One meaning per colour: blue = selection, lighter blue = hover, red = remove-hover only, grey dashed = drag preview, purple = bridge, teal = walk, amber = pair path. |

@@ -142,4 +142,38 @@ public class GraphRendererTest {
         o.cutEdges = new HashSet<Edge>(Arrays.asList(e1));
         paint(blank(), Arrays.asList(a, b), Arrays.asList(e1, e2, loop1, loop2), o);
     }
+
+    @Test
+    public void paint_leavesCallersGraphicsStateAlone() {
+        Graphics2D g = blank().createGraphics();
+        java.awt.Stroke stroke = g.getStroke();
+        Font font = g.getFont();
+        Object aa = g.getRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING);
+        g.setColor(Color.MAGENTA);
+        Vertex a = new Vertex("a", 50, 50);
+        Vertex b = new Vertex("b", 150, 50);
+        GraphRenderer.paint(g, Arrays.asList(a, b), Arrays.asList(new Edge(a, b, true)), new GraphRenderer.Options());
+        assertEquals(Color.MAGENTA, g.getColor());
+        assertSame(stroke, g.getStroke());
+        assertEquals(font, g.getFont());
+        assertEquals(aa, g.getRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING));
+    }
+
+    @Test
+    public void fit_areaSmallerThanMargins_stillPositiveScale() {
+        List<Vertex> vs = Arrays.asList(new Vertex("a", 0, 0), new Vertex("b", 100, 0));
+        assertTrue(GraphRenderer.fit(vs, 60, 60, 50).getScaleX() > 0);
+    }
+
+    @Test
+    public void arrowhead_drawnOverRootRing() {
+        Vertex a = new Vertex("a", 20, 100);
+        Vertex b = new Vertex("b", 150, 100);
+        b.isRoot = true;
+        BufferedImage img = blank();
+        paint(img, Arrays.asList(a, b), Arrays.asList(new Edge(a, b, true)), new GraphRenderer.Options());
+        // the root ring crosses the arrowhead's axis at x = 150 - (RADIUS + 8)
+        Color c = pixel(img, 150 - Vertex.RADIUS - 8, 100);
+        assertFalse("arrowhead should cover the green ring, was " + c, c.getGreen() > c.getRed() + 50);
+    }
 }

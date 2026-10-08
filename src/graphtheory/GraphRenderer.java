@@ -55,21 +55,24 @@ public final class GraphRenderer {
 
     private GraphRenderer() {}
 
-    public static void paint(Graphics2D g, List<Vertex> vertices, List<Edge> edges, Options o) {
-        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-        g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
-        Stroke oldStroke = g.getStroke();
-        Font oldFont = g.getFont();
+    /** Draws on a copy of g, so the caller's colour, stroke, font and rendering hints are untouched. */
+    public static void paint(Graphics2D g0, List<Vertex> vertices, List<Edge> edges, Options o) {
+        Graphics2D g = (Graphics2D) g0.create();
+        try {
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
 
-        EdgeShapes shapes = EdgeShapes.of(edges);
-        boolean weighted = Edge.isWeighted(edges);
-        for (Edge e : edges) drawEdge(g, shapes, e, o);
-        for (Edge e : edges) drawEdgeLabel(g, shapes, e, weighted);
-        for (Vertex v : vertices) drawVertex(g, v, o);
-
-        g.setStroke(oldStroke);
-        g.setFont(oldFont);
+            EdgeShapes shapes = EdgeShapes.of(edges);
+            boolean weighted = Edge.isWeighted(edges);
+            for (Edge e : edges) drawEdge(g, shapes, e, o);
+            for (Edge e : edges) drawEdgeLabel(g, shapes, e, weighted);
+            for (Vertex v : vertices) drawVertex(g, v, o);
+            // After the vertices, so rings and the selection glow never paint over an arrowhead.
+            for (Edge e : edges) if (e.directed) drawArrowhead(g, shapes, e, o);
+        } finally {
+            g.dispose();
+        }
     }
 
     /** Scales (never up) and centres the vertices' bounding box in a w×h area, keeping margin free. */
@@ -86,7 +89,9 @@ public final class GraphRenderer {
         }
         double sw = Math.max(1, maxX - minX);
         double sh = Math.max(1, maxY - minY);
-        double s = Math.min(1.0, Math.min((w - 2.0 * margin) / sw, (h - 2.0 * margin) / sh));
+        double availW = Math.max(1, w - 2.0 * margin);
+        double availH = Math.max(1, h - 2.0 * margin);
+        double s = Math.min(1.0, Math.min(availW / sw, availH / sh));
         t.translate(w / 2.0 - (minX + maxX) / 2.0 * s, h / 2.0 - (minY + maxY) / 2.0 * s);
         t.scale(s, s);
         return t;
@@ -111,12 +116,21 @@ public final class GraphRenderer {
         if (e.isSelfLoop()) {
             double[] l = shapes.loop(e);
             g.draw(circle(l[0], l[1], l[2]));
-            // clockwise, at the top of the loop
-            if (e.directed) arrowhead(g, l[0], l[1] - l[2], 0.0, 9);
         } else {
             double[] cv = shapes.curve(e);
             g.draw(new QuadCurve2D.Double(cv[0], cv[1], cv[2], cv[3], cv[4], cv[5]));
-            if (e.directed) arrowhead(g, cv[4], cv[5], Math.atan2(cv[5] - cv[3], cv[4] - cv[2]), 12);
+        }
+    }
+
+    private static void drawArrowhead(Graphics2D g, EdgeShapes shapes, Edge e, Options o) {
+        g.setColor(edgeColor(e, o));
+        if (e.isSelfLoop()) {
+            double[] l = shapes.loop(e);
+            // clockwise, at the top of the loop
+            arrowhead(g, l[0], l[1] - l[2], 0.0, 9);
+        } else {
+            double[] cv = shapes.curve(e);
+            arrowhead(g, cv[4], cv[5], Math.atan2(cv[5] - cv[3], cv[4] - cv[2]), 12);
         }
     }
 
@@ -136,20 +150,23 @@ public final class GraphRenderer {
         if (weight.isEmpty() && step.isEmpty()) return;
         String first = weight.isEmpty() || step.isEmpty() ? weight : weight + " ";
 
+        g.setFont(LABEL_FONT);
+        FontMetrics fm = g.getFontMetrics();
+        double bw = fm.stringWidth(first + step) + 8;
+
+        // (x, y) is the box centre. A loop's box starts just right of the loop's top, whose
+        // height steps by 2 * LOOP_STEP per nested loop, so the boxes stack without overlapping.
         double x, y;
         if (e.isSelfLoop()) {
             double[] l = shapes.loop(e);
-            x = l[0] + l[2] * 0.71 + 12;
-            y = l[1] - l[2] * 0.71;
+            x = l[0] + 10 + bw / 2;
+            y = l[1] - l[2];
         } else {
             double[] p = EdgeShapes.at(shapes.curve(e), 0.5);
             x = p[0];
             y = p[1];
         }
 
-        g.setFont(LABEL_FONT);
-        FontMetrics fm = g.getFontMetrics();
-        double bw = fm.stringWidth(first + step) + 8;
         double bh = fm.getAscent() + 4;
         double bx = x - bw / 2, by = y - bh / 2;
         RoundRectangle2D box = new RoundRectangle2D.Double(bx, by, bw, bh, 6, 6);

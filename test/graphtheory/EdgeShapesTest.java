@@ -135,14 +135,14 @@ public class EdgeShapesTest {
     }
 
     @Test
-    public void loops_nestWithTopsFourteenApart() {
+    public void loops_nestWithTopsTwoStepsApart() {
         Vertex v = new Vertex("v", 100, 100);
         Edge l1 = new Edge(v, v, false);
         Edge l2 = new Edge(v, v, true);
         EdgeShapes s = shapes(l1, l2);
         double top1 = s.loop(l1)[1] - s.loop(l1)[2];
         double top2 = s.loop(l2)[1] - s.loop(l2)[2];
-        assertEquals(14, top1 - top2, EPS);
+        assertEquals(2 * EdgeShapes.LOOP_STEP, top1 - top2, EPS);
     }
 
     @Test
@@ -183,5 +183,12 @@ public class EdgeShapesTest {
         // Samples along a 1000px edge are ~30px apart; a click on the line between two must still hit.
         assertSame(e, shapes(e).nearest(33, 0));
         assertSame(e, shapes(e).nearest(33, 5));
+    }
+
+    @Test
+    public void spacing_leavesRoomForALabelBetweenNeighbours() {
+        // A label box is 16px tall (11pt font ascent + 4), so neighbours must be further apart.
+        assertTrue(EdgeShapes.FAN_SPACING / 2 > 16);
+        assertTrue(2 * EdgeShapes.LOOP_STEP > 16);
     }
 }
