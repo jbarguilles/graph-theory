@@ -217,6 +217,7 @@ public class Canvas {
     private void selectTool(int tool) {
         clearHover();
         walkMessage = null;
+        dragPoint = null;
         selectedTool = tool;
         if (tool == Tools.PAIR) {
             pairedVertex1Index = -1;
@@ -343,6 +344,7 @@ public class Canvas {
         currentPairVP = null;
         pairPaths = null;
         pressBefore = null;
+        dragPoint = null;
         markGraphDirty();
         if (selectedWindow == 1) computeProperties();
     }
@@ -963,6 +965,8 @@ public class Canvas {
                         break;
                     }
                     case 7: {
+                        // Vertices take priority over edges, as everywhere else.
+                        if (vertexAt(e.getX(), e.getY()) != null) break;
                         Edge target = edgeAt(e.getX(), e.getY());
                         if (target != null) {
                             editEdgeWeight(target);
@@ -1304,6 +1308,7 @@ public class Canvas {
 
     /** Grey dashed line from the pressed vertex to the mouse while dragging out an edge. */
     private void drawDragPreview(Graphics2D g) {
+        if (selectedTool != 2 && selectedTool != 5) return;
         if (dragPoint == null || clickedVertexIndex < 0 || clickedVertexIndex >= vertexList.size()) return;
         Vertex from = vertexList.get(clickedVertexIndex);
         g.setColor(Color.GRAY);
