@@ -528,7 +528,7 @@ public class Canvas {
         if (statusHint == null) return;
         statusHint.setText(selectedWindow == 0
                 ? Tools.hint(selectedTool) + "  (Ctrl+Shift+C: greedy colouring)"
-                : "Ctrl+C copies the selected cells · Ctrl+Shift+C colours the graph greedily · switch to the Graph tab to edit.");
+                : "Ctrl+C copies the selected cells \u00b7 Ctrl+Shift+C colours the graph greedily \u00b7 switch to the Graph tab to edit.");
         statusCounts.setText(vertexList.size() + " vertices \u00b7 " + edgeList.size() + " edges");
     }
 
