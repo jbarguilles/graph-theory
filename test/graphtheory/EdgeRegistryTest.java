@@ -38,7 +38,7 @@ public class EdgeRegistryTest {
     }
 
     @Test
-    public void undirectedEdge_givesBothDirections_butAnEarlierArcKeepsPriority() {
+    public void arcAndUndirectedEdge_eachDirectionTakesItsCheapest() {
         Vertex a = new Vertex("a", 0, 0);
         Vertex b = new Vertex("b", 0, 0);
         Vector<Edge> es = new Vector<Edge>();
@@ -47,5 +47,52 @@ public class EdgeRegistryTest {
         EdgeRegistry.rebuild(es);
         assertEquals(3, EdgeRegistry.weightOf(a, b));
         assertEquals(7, EdgeRegistry.weightOf(b, a));
+    }
+
+    @Test
+    public void parallelUndirectedEdges_cheapestWinsBothWays() {
+        Vertex a = new Vertex("a", 0, 0);
+        Vertex b = new Vertex("b", 0, 0);
+        Vector<Edge> es = new Vector<Edge>();
+        es.add(edge(a, b, false, 5));
+        es.add(edge(a, b, false, 2));
+        EdgeRegistry.rebuild(es);
+        assertEquals(2, EdgeRegistry.weightOf(a, b));
+        assertEquals(2, EdgeRegistry.weightOf(b, a));
+    }
+
+    @Test
+    public void parallelArcs_cheapestWins_notTheLast() {
+        Vertex a = new Vertex("a", 0, 0);
+        Vertex b = new Vertex("b", 0, 0);
+        Vector<Edge> es = new Vector<Edge>();
+        es.add(edge(a, b, true, 4));
+        es.add(edge(a, b, true, 9));
+        EdgeRegistry.rebuild(es);
+        assertEquals(4, EdgeRegistry.weightOf(a, b));
+        assertEquals(-1, EdgeRegistry.weightOf(b, a));
+    }
+
+    @Test
+    public void laterCheaperArc_beatsEarlierUndirectedEdge_inItsDirectionOnly() {
+        Vertex a = new Vertex("a", 0, 0);
+        Vertex b = new Vertex("b", 0, 0);
+        Vector<Edge> es = new Vector<Edge>();
+        es.add(edge(a, b, false, 8));
+        es.add(edge(a, b, true, 1));
+        EdgeRegistry.rebuild(es);
+        assertEquals(1, EdgeRegistry.weightOf(a, b));
+        assertEquals(8, EdgeRegistry.weightOf(b, a));
+    }
+
+    @Test
+    public void weightZero_isAValidEdge() {
+        Vertex a = new Vertex("a", 0, 0);
+        Vertex b = new Vertex("b", 0, 0);
+        Vector<Edge> es = new Vector<Edge>();
+        es.add(edge(a, b, false, 3));
+        es.add(edge(a, b, false, 0));
+        EdgeRegistry.rebuild(es);
+        assertEquals(0, EdgeRegistry.weightOf(a, b));
     }
 }

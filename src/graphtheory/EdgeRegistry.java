@@ -6,6 +6,8 @@ import java.util.Vector;
 
 /**
  * Static lookup table mapping (u, v) → weight for the current graph.
+ * With parallel edges, (u, v) holds the cheapest edge that can be crossed
+ * from u to v: an arc u → v, or an undirected edge {u, v}.
  * Rebuilt by Canvas.refresh() on every redraw, so it is always in sync
  * with the current edgeList. Used by VertexPair for weighted Dijkstra.
  * Keyed by Vertex identity, so names never matter.
@@ -21,15 +23,9 @@ public class EdgeRegistry {
         for (Edge e : edgeList) {
             if (e == null || e.vertex1 == null || e.vertex2 == null) continue;
 
-            if (e.directed) {
-                // Directed arc: only u → v gets the weight.
-                put(e.vertex1, e.vertex2, e.weight);
-            } else {
-                // Undirected: both u → v and v → u get the same weight.
-                // A previously-registered directed arc keeps priority.
-                if (!has(e.vertex1, e.vertex2)) put(e.vertex1, e.vertex2, e.weight);
-                if (!has(e.vertex2, e.vertex1)) put(e.vertex2, e.vertex1, e.weight);
-            }
+            // A directed arc can only be crossed u → v; an undirected edge either way.
+            keepCheapest(e.vertex1, e.vertex2, e.weight);
+            if (!e.directed) keepCheapest(e.vertex2, e.vertex1, e.weight);
         }
     }
 
@@ -41,17 +37,14 @@ public class EdgeRegistry {
         return w == null ? -1 : w;
     }
 
-    private static boolean has(Vertex u, Vertex v) {
-        Map<Vertex, Integer> out = weights.get(u);
-        return out != null && out.containsKey(v);
-    }
-
-    private static void put(Vertex u, Vertex v, int w) {
+    /** Records w for u → v unless a cheaper (or equal) edge is already there. */
+    private static void keepCheapest(Vertex u, Vertex v, int w) {
         Map<Vertex, Integer> out = weights.get(u);
         if (out == null) {
             out = new HashMap<Vertex, Integer>();
             weights.put(u, out);
         }
-        out.put(v, w);
+        Integer old = out.get(v);
+        if (old == null || w < old) out.put(v, w);
     }
 }
