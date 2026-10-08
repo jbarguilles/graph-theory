@@ -29,10 +29,10 @@ public class GraphProperties {
     public int[][] distanceMatrix;
     public Vector<VertexPair> vpList;
 
-    public Vector<Vertex> witnessVertices = new Vector<Vertex>();
+    public Vector<Vertex> minVertexCut = new Vector<Vertex>();
     public int vertexConnectivityValue = 0;
 
-    public Vector<Edge> witnessEdges = new Vector<Edge>();
+    public Vector<Edge> minEdgeCut = new Vector<Edge>();
     public int edgeConnectivityValue = 0;
 
     /** Number of blocks computed by the last call to computeBlocks(). */
@@ -1544,7 +1544,7 @@ private boolean tryMatch(List<Vertex> order, int idx,
     // ---- Vertex connectivity κ(G) ----
 
     public int vertexConnectivity(Vector<Vertex> vList) {
-        witnessVertices = new Vector<Vertex>();
+        minVertexCut = new Vector<Vertex>();
         vertexConnectivityValue = 0;
 
         int n = vList.size();
@@ -1558,14 +1558,14 @@ private boolean tryMatch(List<Vertex> order, int idx,
             Vector<Vertex> cut = new Vector<Vertex>();
             if (findCutOfSize(vList, k, 0, cut)) {
                 vertexConnectivityValue = k;
-                witnessVertices = cut;
+                minVertexCut = cut;
                 return k;
             }
         }
 
         vertexConnectivityValue = n - 1;
         for (int i = 0; i < n - 1; i++) {
-            witnessVertices.add(vList.get(i));
+            minVertexCut.add(vList.get(i));
         }
         return n - 1;
     }
@@ -1633,7 +1633,7 @@ private boolean tryMatch(List<Vertex> order, int idx,
     // ---- Edge connectivity λ(G) ----
 
     public int edgeConnectivity(Vector<Vertex> vList, Vector<Edge> eList) {
-        witnessEdges = new Vector<Edge>();
+        minEdgeCut = new Vector<Edge>();
         edgeConnectivityValue = 0;
 
         int n = vList.size();
@@ -1650,13 +1650,13 @@ private boolean tryMatch(List<Vertex> order, int idx,
             Vector<Edge> cut = new Vector<Edge>();
             if (findEdgeCutOfSize(vList, eList, k, 0, cut)) {
                 edgeConnectivityValue = k;
-                witnessEdges = cut;
+                minEdgeCut = cut;
                 return k;
             }
         }
 
         edgeConnectivityValue = m;
-        witnessEdges = new Vector<Edge>(eList);
+        minEdgeCut = new Vector<Edge>(eList);
         return m;
     }
 

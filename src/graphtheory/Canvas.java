@@ -15,6 +15,7 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
 import java.io.IOException;
+import java.util.HashSet;
 import java.awt.event.KeyEvent;
 import java.util.Set;
 import java.util.Vector;
@@ -70,6 +71,10 @@ public class Canvas {
     private int selectedPathIndex = 0;
     private static final Color PATH_COLOR = new Color(220, 160, 0);
     private static final int PATH_ROWS = 6;
+
+    // Size of the graph picture at the top left of the Properties tab.
+    private static final int THUMB_W = 400;
+    private static final int THUMB_H = 300;
 
     public Canvas(String appName, int width, int height, Color bgColour) {
         this.appName = appName;
@@ -455,12 +460,6 @@ public class Canvas {
             gP.vertexConnectivity(vertexList);
             gP.edgeConnectivity(vertexList, edgeList);
 
-            for (Vertex v : vertexList) v.wasClicked = false;
-            for (Edge ed : edgeList)    ed.wasClicked = false;
-
-            for (Vertex v : gP.witnessVertices) v.wasClicked = true;
-            for (Edge ed : gP.witnessEdges)     ed.wasClicked = true;
-
             reloadVertexConnections(matrix, vertexList);
 
             gP.generateDistanceMatrix(vertexList);
@@ -485,6 +484,26 @@ public class Canvas {
                 "About " + appName, JOptionPane.INFORMATION_MESSAGE);
     }
 
+    /** The graph fitted into a box, with the minimum vertex and edge cuts marked. */
+    private void drawThumbnail(Graphics2D g, int x, int y, int w, int h) {
+        Graphics2D t = (Graphics2D) g.create();
+        try {
+            t.clipRect(x, y, w, h);
+            t.translate(x, y);
+            t.setColor(backgroundColour);
+            t.fillRect(0, 0, w, h);
+            t.transform(GraphRenderer.fit(vertexList, w, h, 40));
+            GraphRenderer.Options o = new GraphRenderer.Options();
+            o.cutVertices = new HashSet<Vertex>(gP.minVertexCut);
+            o.cutEdges = new HashSet<Edge>(gP.minEdgeCut);
+            GraphRenderer.paint(t, vertexList, edgeList, o);
+        } finally {
+            t.dispose();
+        }
+        g.setColor(Color.BLACK);
+        g.drawRect(x, y, w, h);
+    }
+
     private void buildPropertiesPanel() {
         propertiesContent = new JPanel() {
             @Override
@@ -497,10 +516,11 @@ public class Canvas {
                 g2.setColor(Color.WHITE);
                 g2.fillRect(0, 0, w, h);
 
-                g2.setColor(Color.BLACK);
-                g2.drawRect(10, 10, width / 2, height / 2);
+                drawThumbnail(g2, 10, 10, THUMB_W, THUMB_H);
+                g2.setStroke(new BasicStroke(1f));
+                g2.setFont(getFont());
 
-                int rightX = width / 2 + 60;
+                int rightX = THUMB_W + 60;
                 int adjY = 50;
                 gP.drawAdjacencyMatrix(g2, vertexList, rightX, adjY);
                 int adjHeight = (vertexList.size() + 1) * 20 + 30;
@@ -512,7 +532,7 @@ public class Canvas {
                 int summaryY = distY + distHeight + 20;
                 int summaryHeight = gP.drawGraphSummary(g2, vertexList, edgeList, rightX, summaryY);
 
-                int nodeY = height / 2 + 90;
+                int nodeY = THUMB_H + 90;
                 gP.drawNodePropertiesTable(g2, vertexList, 10, nodeY);
                 int nodeTableHeight = (vertexList.size() + 2) * 18 + 10;
 
@@ -547,14 +567,14 @@ public class Canvas {
                 + matrixHeight + 20
                 + 34 * 16 + 20;
         int leftHeight = 10
-                       + height / 2 + 20
+                       + THUMB_H + 20
                        + (vertexList.size() + 2) * 18 + 30
                        + (vertexList.size() + 1) * 18 + 20
                        + 80;
 
         int neededHeight = Math.max(rightHeight, leftHeight) + 60;
         neededHeight = Math.max(neededHeight, height);
-        int neededWidth = Math.max(width + 40, width / 2 + 60 + 700);
+        int neededWidth = Math.max(width + 40, THUMB_W + 60 + 700);
 
         propertiesContent.setPreferredSize(new Dimension(neededWidth, neededHeight));
         propertiesContent.revalidate();
