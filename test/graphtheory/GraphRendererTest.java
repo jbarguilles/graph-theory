@@ -176,4 +176,14 @@ public class GraphRendererTest {
         Color c = pixel(img, 150 - Vertex.RADIUS - 8, 100);
         assertFalse("arrowhead should cover the green ring, was " + c, c.getGreen() > c.getRed() + 50);
     }
+
+    @Test
+    public void paintGrid_dotsEveryGridStep() {
+        BufferedImage img = blank();
+        Graphics2D g = img.createGraphics();
+        GraphRenderer.paintGrid(g, 200, 200);
+        g.dispose();
+        assertEquals(GraphRenderer.GRID, pixel(img, GraphRenderer.GRID_STEP, GraphRenderer.GRID_STEP));
+        assertEquals(Color.WHITE, pixel(img, GraphRenderer.GRID_STEP + 10, GraphRenderer.GRID_STEP + 10));
+    }
 }

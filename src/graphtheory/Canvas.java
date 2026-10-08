@@ -94,7 +94,7 @@ public class Canvas {
                 exitApp();
             }
         });
-        frame.setResizable(false);
+        frame.setResizable(true);
 
         canvas = new CanvasPane();
         canvas.setPreferredSize(new Dimension(width, height));
@@ -280,6 +280,15 @@ public class Canvas {
         return EdgeShapes.of(edgeList).nearest(x, y);
     }
 
+    /** The Graph canvas's current size; before it is laid out, the size it was created with. */
+    private int canvasWidth() {
+        return canvas.getWidth() > 0 ? canvas.getWidth() : width;
+    }
+
+    private int canvasHeight() {
+        return canvas.getHeight() > 0 ? canvas.getHeight() : height;
+    }
+
     private void editEdgeWeight(Edge target) {
         String input = JOptionPane.showInputDialog(
                 frame,
@@ -396,8 +405,8 @@ public class Canvas {
             return;
         }
         String asWritten = GraphFile.write(d.vertices, d.edges);
-        Layout.arrangeOnCircle(d.unplaced, width, height);
-        Layout.clampInto(d.vertices, width, height);
+        Layout.arrangeOnCircle(d.unplaced, canvasWidth(), canvasHeight());
+        Layout.clampInto(d.vertices, canvasWidth(), canvasHeight());
         replaceGraph(d.vertices, d.edges);
         history.clear();
         currentFile = f;
@@ -1240,7 +1249,7 @@ public class Canvas {
     }
 
     private void arrangeVertices() {
-        Layout.arrangeOnCircle(vertexList, width, height);
+        Layout.arrangeOnCircle(vertexList, canvasWidth(), canvasHeight());
     }
 
     private void reloadVertexConnections(int[][] aMatrix, Vector<Vertex> vList) {
@@ -1444,7 +1453,7 @@ public class Canvas {
     private void drawWalkInfoBox(Graphics g) {
         if (currentWalk == null && walkMessage == null) return;
 
-        int x = 10, y = 420, w = 360, h = 95;
+        int x = 10, y = canvasHeight() - 180, w = 360, h = 95;
         g.setColor(new Color(235, 250, 250));
         g.fillRect(x, y, w, h);
         g.setColor(Color.BLACK);
@@ -1479,6 +1488,7 @@ public class Canvas {
             g2.setColor(backgroundColour);
             g2.fillRect(0, 0, getWidth(), getHeight());
             if (selectedWindow != 0) return;
+            GraphRenderer.paintGrid(g2, getWidth(), getHeight());
 
             GraphRenderer.Options o = new GraphRenderer.Options();
             o.interaction = true;

@@ -34,6 +34,8 @@ public final class GraphRenderer {
     public static final Color CUTPOINT = new Color(255, 140, 0);
     public static final Color ISOLATED = Color.GRAY;
     public static final Color CUT      = new Color(200, 0, 120);
+    public static final Color GRID = new Color(225, 225, 225);
+    public static final int GRID_STEP = 20;
 
     private static final Color GLOW         = new Color(30, 100, 220, 70);
     private static final Color LABEL_TEXT   = new Color(80, 80, 80);
@@ -73,6 +75,18 @@ public final class GraphRenderer {
         } finally {
             g.dispose();
         }
+    }
+
+    /** Faint dots every GRID_STEP pixels, behind the graph. Purely visual; nothing snaps to it. */
+    public static void paintGrid(Graphics2D g, int w, int h) {
+        Color old = g.getColor();
+        g.setColor(GRID);
+        for (int x = GRID_STEP; x < w; x += GRID_STEP) {
+            for (int y = GRID_STEP; y < h; y += GRID_STEP) {
+                g.fillRect(x - 1, y - 1, 2, 2);
+            }
+        }
+        g.setColor(old);
     }
 
     /** Scales (never up) and centres the vertices' bounding box in a w×h area, keeping margin free. */
