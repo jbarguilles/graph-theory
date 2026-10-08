@@ -4,8 +4,10 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /** Matchings (CONTEXT.md), ignoring direction; a self-loop is never in a matching. */
 public final class Matchings {
@@ -17,9 +19,11 @@ public final class Matchings {
 
     /** A maximal matching: edges taken greedily in edge order. */
     public static List<Edge> maximal(List<Vertex> vs, List<Edge> es) {
-        List<Vertex> used = new ArrayList<Vertex>();
+        Set<Vertex> known = new HashSet<Vertex>(vs);
+        Set<Vertex> used = new HashSet<Vertex>();
         List<Edge> out = new ArrayList<Edge>();
         for (Edge e : es) {
+            if (!known.contains(e.vertex1) || !known.contains(e.vertex2)) continue;
             if (e.vertex1 == e.vertex2 || used.contains(e.vertex1) || used.contains(e.vertex2)) continue;
             out.add(e);
             used.add(e.vertex1);
@@ -35,8 +39,9 @@ public final class Matchings {
         Map<Vertex, Integer> idx = GraphMatrices.index(vs);
         final Edge[][] join = new Edge[n][n];
         for (Edge e : es) {
-            int i = idx.get(e.vertex1), j = idx.get(e.vertex2);
-            if (i == j || join[i][j] != null) continue;
+            Integer i = idx.get(e.vertex1), j = idx.get(e.vertex2);
+            if (i == null || j == null) continue;
+            if (i.intValue() == j.intValue() || join[i][j] != null) continue;
             join[i][j] = join[j][i] = e;
         }
         final int[] memo = new int[1 << n];
@@ -84,6 +89,7 @@ public final class Matchings {
      * The stable matching found by Gale–Shapley with the side containing 'proposer' proposing
      * (side A if proposer is null or not in the graph). null when the graph is not bipartite or
      * some vertex with a neighbour has no preference list.
+     * Assumes preference lists are in step with the edges (PreferenceLists.sync).
      */
     public static List<Edge> stable(List<Vertex> vs, List<Edge> es, Vertex proposer) {
         List<List<Vertex>> sides = Structure.bipartiteSides(vs, es);

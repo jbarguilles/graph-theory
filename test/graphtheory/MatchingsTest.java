@@ -71,6 +71,72 @@ public class MatchingsTest {
         assertNull(Matchings.stable(vs(a, b, c), es(und(a, b), und(b, c), und(c, a)), a));
     }
 
+    @Test
+    public void maximum_isAValidMatching() {
+        List<Edge> edges = es(und(a, b), und(b, c), und(c, d), und(a, a), arc(d, a));
+        List<Edge> m = Matchings.maximum(vs(a, b, c, d), edges);
+        java.util.Set<Vertex> seen = new java.util.HashSet<Vertex>();
+        for (Edge e : m) {
+            assertTrue(edges.contains(e));
+            assertNotSame(e.vertex1, e.vertex2);
+            assertTrue(seen.add(e.vertex1));
+            assertTrue(seen.add(e.vertex2));
+        }
+        assertEquals(2, m.size());
+    }
+
+    @Test
+    public void maximum_selfLoopAndParallelEdges() {
+        List<Edge> m = Matchings.maximum(vs(a, b), es(und(a, a), und(a, b), arc(b, a), und(a, b)));
+        assertEquals(1, m.size());
+        assertNotSame(m.get(0).vertex1, m.get(0).vertex2);
+    }
+
+    @Test
+    public void maximum_emptyGraph() {
+        assertTrue(Matchings.maximum(vs(), es()).isEmpty());
+    }
+
+    @Test
+    public void matchings_skipEdgesOutsideTheVertexList() {
+        assertEquals(1, Matchings.maximum(vs(a, b), es(und(a, c), und(a, b))).size());
+        assertEquals(1, Matchings.maximal(vs(a, b), es(und(a, c), und(a, b))).size());
+    }
+
+    @Test
+    public void stable_starMatchesExactlyOneLeaf() {
+        List<Edge> edges = es(und(a, b), und(a, c));
+        a.preferences = prefs(c, b);
+        b.preferences = prefs(a);
+        c.preferences = prefs(a);
+        List<Edge> m = Matchings.stable(vs(a, b, c), edges, a);
+        assertEquals(1, m.size());
+        assertTrue(joins(m, a, c));
+        m = Matchings.stable(vs(a, b, c), edges, b);
+        assertEquals(1, m.size());
+        assertTrue(joins(m, a, c));
+    }
+
+    @Test
+    public void stable_nullOrForeignProposerMeansSideA() {
+        List<Edge> edges = es(und(a, b), und(a, d), und(c, b), und(c, d));
+        a.preferences = prefs(b, d);
+        c.preferences = prefs(d, b);
+        b.preferences = prefs(c, a);
+        d.preferences = prefs(a, c);
+        for (Vertex p : new Vertex[] {null, v("outsider")}) {
+            List<Edge> m = Matchings.stable(vs(a, b, c, d), edges, p);
+            assertTrue(joins(m, a, b) && joins(m, c, d));
+        }
+    }
+
+    @Test
+    public void stable_selfLoopIsNull() {
+        a.preferences = prefs(b);
+        b.preferences = prefs(a);
+        assertNull(Matchings.stable(vs(a, b), es(und(a, b), und(a, a)), a));
+    }
+
     private static boolean joins(List<Edge> m, Vertex x, Vertex y) {
         for (Edge e : m) {
             if ((e.vertex1 == x && e.vertex2 == y) || (e.vertex1 == y && e.vertex2 == x)) return true;
