@@ -211,10 +211,6 @@ public class VertexPair {
             // the width is vertex-based, so keep each vertex sequence once (ADR 0002).
             if (pathList.contains(Path)) return;
             pathList.add(Path);
-            for (Vertex a : Path) {
-                System.out.print("-" + a.name);
-            }
-            System.out.println();
         } else {
             for (Vertex x : v.undirectedNeighbors) {
                 if (!visitedNodes.contains(x)) {
