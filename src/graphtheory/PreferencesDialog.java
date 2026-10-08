@@ -45,7 +45,7 @@ public class PreferencesDialog extends JDialog {
         vertexList.setCellRenderer(new DefaultListCellRenderer() {
             @Override public Component getListCellRendererComponent(JList<?> l, Object value, int i, boolean sel, boolean f) {
                 Vertex v = (Vertex) value;
-                String mark = PreferencesDialog.this.editor.listOf(v) == null ? "  (no list)" : "  ✓";
+                String mark = PreferencesDialog.this.editor.listOf(v) == null ? "  (no list)" : "  \u2713";
                 return super.getListCellRendererComponent(l, v.name + mark, i, sel, f);
             }
         });
