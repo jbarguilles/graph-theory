@@ -39,8 +39,9 @@ public class Canvas {
     private JMenuItem undoItem;
     private JMenuItem redoItem;
     private int clickedEdgeIndex;
-    private int pairedVertex1Index = -1;
-    private int pairedVertex2Index = -1;
+    // The pair being picked with the Pair tool: first vertex, then second (null = not picked yet)
+    private Vertex pairFirst = null;
+    private Vertex pairSecond = null;
     private VertexPair currentPairVP = null;
     private FileManager fileManager = new FileManager();
     private File currentFile = null;
@@ -75,6 +76,8 @@ public class Canvas {
 
     // The Find command (e.g. "Euler Tour") that produced currentWalk, or null for a built walk
     private String foundKind = null;
+    // The graph a found walk was found in; when it changes the found walk is dropped
+    private GraphShape foundShape = null;
 
     private SidePanel sidePanel;
 
@@ -240,14 +243,6 @@ public class Canvas {
         walkMessage = null;
         dragPoint = null;
         selectedTool = tool;
-        if (tool == Tools.PAIR) {
-            pairedVertex1Index = -1;
-            pairedVertex2Index = -1;
-            currentPairVP = null;
-            pairSummary = null;
-        } else if (tool == Tools.WALK) {
-            clearWalk();
-        }
         palette.setSelectedTool(tool);
         tabs.setSelectedIndex(0);
         refresh();
@@ -268,6 +263,7 @@ public class Canvas {
     /** Call after an edit with the snapshot from before it. */
     private void afterEdit(String before) {
         if (!before.equals(snapshot())) {
+            if (foundShape != null && !foundShape.matches(vertexList, edgeList)) clearWalk();
             history.record(before);
             markGraphDirty();
             if (selectedWindow == 1) computeProperties();
@@ -360,8 +356,8 @@ public class Canvas {
         edgeList = es;
         clearWalk();
         clickedVertexIndex = -1;
-        pairedVertex1Index = -1;
-        pairedVertex2Index = -1;
+        pairFirst = null;
+        pairSecond = null;
         currentPairVP = null;
         pairSummary = null;
         pressBefore = null;
@@ -668,6 +664,19 @@ public class Canvas {
     private void clearWalk() {
         currentWalk = null;
         walkMessage = null;
+        foundKind = null;
+        foundShape = null;
+    }
+
+    /** Forgets the pair (Esc with the Pair tool, or picking a new first vertex) and unselects its vertices. */
+    private void clearPair() {
+        if (pairFirst != null) pairFirst.wasClicked = false;
+        if (pairSecond != null) pairSecond.wasClicked = false;
+        pairFirst = null;
+        pairSecond = null;
+        currentPairVP = null;
+        pairSummary = null;
+        selectedPathIndex = 0;
     }
 
     /** Recomputes the selected pair's summary (paths, distances) after the pair or the graph changes. */
@@ -700,10 +709,19 @@ public class Canvas {
             }
         });
 
-        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "walkClear");
-        am.put("walkClear", new AbstractAction() {
+        // Esc clears what the active tool owns: the walk (Walk tool) or the pair (Pair tool).
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "clearToolState");
+        am.put("clearToolState", new AbstractAction() {
             public void actionPerformed(ActionEvent e) {
-                if (selectedTool == 9 && selectedWindow == 0) { clearWalk(); refresh(); }
+                if (selectedWindow != 0) return;
+                if (selectedTool == Tools.WALK) {
+                    clearWalk();
+                } else if (selectedTool == Tools.PAIR) {
+                    clearPair();
+                } else {
+                    return;
+                }
+                refresh();
             }
         });
 
@@ -732,6 +750,7 @@ public class Canvas {
 
     /** Removes the walk's last step; undoing a trivial walk clears it. */
     private void undoWalkStep() {
+        if (foundKind != null) return;   // a found walk is read-only
         walkMessage = null;
         if (currentWalk != null && !currentWalk.undo()) currentWalk = null;
     }
@@ -744,6 +763,14 @@ public class Canvas {
         }
         Edge hitE = hitV == null ? edgeAt(x, y) : null;
         if (hitV == null && hitE == null) return;
+        if (foundKind != null) {
+            // A found walk is read-only: clicking a vertex starts a new built walk in its place.
+            if (hitV == null) {
+                walkMessage = "Click a vertex to start a new walk";
+                return;
+            }
+            clearWalk();
+        }
 
         if (currentWalk == null) {
             if (hitV == null) {
@@ -800,7 +827,12 @@ public class Canvas {
         } else if (kind.equals("Hamiltonian Cycle")) {
             currentWalk = Traversals.hamiltonianCycle(vertexList, edgeList);
         }
-        if (currentWalk == null) walkMessage = "No " + kind + " exists";
+        if (currentWalk == null) {
+            walkMessage = "No " + kind + " exists";
+        } else {
+            foundKind = kind;
+            foundShape = GraphShape.of(vertexList, edgeList);
+        }
     }
 
     private Set<Vertex> connectedComponentOf(Vertex start) {
@@ -894,26 +926,20 @@ public class Canvas {
                         break;
                     }
                     case 6: {
-                        for (Vertex v : vertexList) {
-                            if (v.hasIntersection(e.getX(), e.getY())) {
-                                int idx = vertexList.indexOf(v);
-                                if (pairedVertex1Index == -1) {
-                                    pairedVertex1Index = idx;
-                                    v.wasClicked = true;
-                                } else if (pairedVertex2Index == -1 && idx != pairedVertex1Index) {
-                                    pairedVertex2Index = idx;
-                                    v.wasClicked = true;
-                                    currentPairVP = new VertexPair(vertexList.get(pairedVertex1Index), v);
-                                    refreshPairPaths();
-                                } else {
-                                    if (pairedVertex1Index >= 0) vertexList.get(pairedVertex1Index).wasClicked = false;
-                                    if (pairedVertex2Index >= 0) vertexList.get(pairedVertex2Index).wasClicked = false;
-                                    pairedVertex1Index = idx;
-                                    pairedVertex2Index = -1;
-                                    currentPairVP = null;
-                                    pairSummary = null;
-                                    v.wasClicked = true;
-                                }
+                        Vertex v = vertexAt(e.getX(), e.getY());
+                        if (v != null) {
+                            if (pairFirst == null) {
+                                pairFirst = v;
+                                v.wasClicked = true;
+                            } else if (pairSecond == null && v != pairFirst) {
+                                pairSecond = v;
+                                v.wasClicked = true;
+                                currentPairVP = new VertexPair(pairFirst, pairSecond);
+                                refreshPairPaths();
+                            } else {
+                                clearPair();
+                                pairFirst = v;
+                                v.wasClicked = true;
                             }
                         }
                         refresh();
@@ -943,18 +969,7 @@ public class Canvas {
                                 v.outNeighbors.removeAll(java.util.Collections.singleton(victim));
                             }
 
-                            if (pairedVertex1Index >= 0
-                                    && vertexList.get(pairedVertex1Index) == victim) {
-                                pairedVertex1Index = -1;
-                            }
-                            if (pairedVertex2Index >= 0
-                                    && vertexList.get(pairedVertex2Index) == victim) {
-                                pairedVertex2Index = -1;
-                            }
-                            if (currentPairVP != null
-                                    && (currentPairVP.vertex1 == victim || currentPairVP.vertex2 == victim)) {
-                                currentPairVP = null;
-                            }
+                            if (victim == pairFirst || victim == pairSecond) clearPair();
 
                             if (currentWalk != null && currentWalk.visits(victim)) clearWalk();
                             vertexList.remove(victim);
