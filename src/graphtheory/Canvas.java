@@ -27,9 +27,7 @@ public class Canvas {
     private CanvasPane canvas;
     private JScrollPane propertiesScroll;
     private JPanel propertiesContent;
-    private Graphics2D graphic;
     private Color backgroundColour;
-    private Image canvasImage;
     private int selectedTool;
     private int selectedWindow;
     public int width,  height;
@@ -45,6 +43,8 @@ public class Canvas {
     private File currentFile = null;
     private String savedText;
     private String pressBefore = null;
+    // Where the mouse is while dragging out a new edge (Add/Directed Edge tools); null otherwise.
+    private Point dragPoint = null;
     private final String appName;
     private final MenuListener menuListener = new MenuListener();
     private JTabbedPane tabs;
@@ -272,10 +272,7 @@ public class Canvas {
     }
 
     private Edge edgeAt(int x, int y) {
-        for (Edge ed : edgeList) {
-            if (ed.hasIntersection(x, y)) return ed;
-        }
-        return null;
+        return EdgeShapes.of(edgeList).nearest(x, y);
     }
 
     private void editEdgeWeight(Edge target) {
@@ -500,10 +497,8 @@ public class Canvas {
                 g2.setColor(Color.WHITE);
                 g2.fillRect(0, 0, w, h);
 
-                g2.drawImage(canvasImage.getScaledInstance(width / 2, height / 2, Image.SCALE_SMOOTH),
-                             10, 10, null);
                 g2.setColor(Color.BLACK);
-                g2.draw3DRect(10, 10, width / 2, height / 2, true);
+                g2.drawRect(10, 10, width / 2, height / 2);
 
                 int rightX = width / 2 + 60;
                 int adjY = 50;
@@ -580,8 +575,9 @@ public class Canvas {
             v.removeHover = removeMode && hit;
         }
 
+        Edge hoveredEdge = hoveredVertex == null ? edgeAt(mx, my) : null;
         for (Edge d : edgeList) {
-            boolean hit = (hoveredVertex == null) && d.hasIntersection(mx, my);
+            boolean hit = (d == hoveredEdge);
             d.wasFocused  = hit;
             d.removeHover = removeMode && hit;
         }
@@ -686,12 +682,7 @@ public class Canvas {
         for (Vertex v : vertexList) {
             if (v.hasIntersection(x, y)) { hitV = v; break; }
         }
-        Edge hitE = null;
-        if (hitV == null) {
-            for (Edge ed : edgeList) {
-                if (ed.hasIntersection(x, y)) { hitE = ed; break; }
-            }
-        }
+        Edge hitE = hitV == null ? edgeAt(x, y) : null;
         if (hitV == null && hitE == null) return;
 
         if (currentWalk == null) {
@@ -881,7 +872,6 @@ public class Canvas {
                         String name = VertexNames.nextFree(vertexList);
                         Vertex v = new Vertex(name, e.getX(), e.getY());
                         vertexList.add(v);
-                        v.draw(graphic);
                         markGraphDirty();
                         updateHover(e.getX(), e.getY());
                         refresh();
@@ -968,13 +958,7 @@ public class Canvas {
                             break;
                         }
 
-                        Edge edgeVictim = null;
-                        for (Edge ed : edgeList) {
-                            if (ed.hasIntersection(e.getX(), e.getY())) {
-                                edgeVictim = ed;
-                                break;
-                            }
-                        }
+                        Edge edgeVictim = edgeAt(e.getX(), e.getY());
 
                         if (edgeVictim != null) {
                             Vertex a = edgeVictim.vertex1;
@@ -1109,6 +1093,7 @@ public class Canvas {
 
         @Override
         public void mouseReleased(MouseEvent e) {
+            dragPoint = null;
             String before = pressBefore;
             pressBefore = null;
             if (selectedWindow == 0 && vertexList.size() > 0) {
@@ -1197,13 +1182,8 @@ public class Canvas {
                 switch (selectedTool) {
                     case 2:
                     case 5: {
+                        dragPoint = pressedVertex() != null ? e.getPoint() : null;
                         refresh();
-                        Vertex from = pressedVertex();
-                        if (from != null) {
-                            graphic.setColor(Color.RED);
-                            drawLine(from.location.x, from.location.y, e.getX(), e.getY());
-                        }
-                        canvas.repaint();
                         return;
                     }
                     case 3: {
@@ -1308,14 +1288,6 @@ public class Canvas {
         recomputeGraphProperties();
         EdgeRegistry.rebuild(edgeList);
         applyHighlights();
-        erase();
-        for (Edge e : edgeList) {
-            e.draw(graphic);
-        }
-        for (Vertex v : vertexList) {
-            v.draw(graphic);
-        }
-        drawWalkMarkers(graphic);
         canvas.repaint();
         if (propertiesContent != null) {
             propertiesContent.repaint();
@@ -1348,6 +1320,17 @@ public class Canvas {
         }
     }
 
+    /** Grey dashed line from the pressed vertex to the mouse while dragging out an edge. */
+    private void drawDragPreview(Graphics2D g) {
+        if (dragPoint == null || clickedVertexIndex < 0 || clickedVertexIndex >= vertexList.size()) return;
+        Vertex from = vertexList.get(clickedVertexIndex);
+        g.setColor(Color.GRAY);
+        g.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_ROUND,
+                10f, new float[] { 6f, 4f }, 0f));
+        g.drawLine(from.location.x, from.location.y, dragPoint.x, dragPoint.y);
+        g.setStroke(new BasicStroke(1f));
+    }
+
     private void drawWalkMarkers(Graphics g) {
         if (currentWalk == null) return;
         Vertex s = currentWalk.start();
@@ -1363,40 +1346,11 @@ public class Canvas {
     }
 
     public void setVisible(boolean visible) {
-        if (graphic == null) {
-            Dimension size = new Dimension(width, height);
-            canvasImage = canvas.createImage(size.width, size.height);
-            graphic = (Graphics2D) canvasImage.getGraphics();
-            graphic.setColor(backgroundColour);
-            graphic.fillRect(0, 0, size.width, size.height);
-            graphic.setColor(Color.black);
-        }
         frame.setVisible(visible);
     }
 
     public boolean isVisible() {
         return frame.isVisible();
-    }
-
-    public void erase() {
-        graphic.setColor(backgroundColour);
-        graphic.fillRect(0, 0, width, height);
-        graphic.setColor(Color.black);
-    }
-
-    public void erase(int x, int y, int x1, int y2) {
-        graphic.clearRect(x, y, x1, y2);
-    }
-
-    public void drawString(String text, int x, int y, float size) {
-        Font orig = graphic.getFont();
-        graphic.setFont(graphic.getFont().deriveFont(1, size));
-        graphic.drawString(text, x, y);
-        graphic.setFont(orig);
-    }
-
-    public void drawLine(int x1, int y1, int x2, int y2) {
-        graphic.drawLine(x1, y1, x2, y2);
     }
 
     private void drawInfoBox(Graphics g) {
@@ -1546,20 +1500,24 @@ public class Canvas {
 
     private class CanvasPane extends JPanel {
 
-        public void paint(Graphics g) {
-            switch (selectedWindow) {
-                case 0: {
-                    g.drawImage(canvasImage, 0, 0, null);
-                    drawInfoBox(g);
-                    drawPairInfoBox(g);
-                    drawWalkInfoBox(g);
-                    g.setColor(Color.black);
-                    break;
-                }
-                case 1: {
-                    break;
-                }
-            }
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g;
+            g2.setColor(backgroundColour);
+            g2.fillRect(0, 0, getWidth(), getHeight());
+            if (selectedWindow != 0) return;
+
+            GraphRenderer.Options o = new GraphRenderer.Options();
+            o.interaction = true;
+            GraphRenderer.paint(g2, vertexList, edgeList, o);
+            drawDragPreview(g2);
+            drawWalkMarkers(g2);
+
+            g2.setStroke(new BasicStroke(1f));
+            g2.setFont(getFont());
+            drawInfoBox(g2);
+            drawPairInfoBox(g2);
+            drawWalkInfoBox(g2);
         }
     }
 }

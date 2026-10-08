@@ -7,7 +7,6 @@ package graphtheory;
 import java.awt.Color;
 import java.awt.Point;
 import java.util.Vector;
-import java.awt.Graphics;
 
 /**
  *
@@ -24,8 +23,6 @@ public class Vertex implements Comparable {
     /** Color assigned by greedy coloring; -1 = uncolored (default white). */
     public int colorId = -1;
 
-    private int size1 = 30;
-    private int size2 = 40;
     public Vector<Vertex> undirectedNeighbors;
     public Vector<Vertex> inNeighbors;
     public Vector<Vertex> outNeighbors;
@@ -106,47 +103,5 @@ public class Vertex implements Comparable {
         if (((Vertex) v).getDegree() > getDegree()) return 1;
         else if (((Vertex) v).getDegree() < getDegree()) return -1;
         else return 0;
-    }
-
-    public void draw(Graphics g) {
-        // 1) Body fill
-        if (wasClicked) {
-            g.setColor(Color.red);
-        } else if (wasFocused) {
-            g.setColor(Color.blue);
-        } else {
-            g.setColor(Color.black);
-        }
-        g.fillOval(location.x - size2 / 2, location.y - size2 / 2, size2, size2);
-
-        // 2) Inner disc — palette color if colored, else white
-        if (colorId >= 0) {
-            g.setColor(PALETTE[colorId % PALETTE.length]);
-        } else {
-            g.setColor(Color.WHITE);
-        }
-        g.fillOval(location.x - size1 / 2, location.y - size1 / 2, size1, size1);
-
-        // 3) Property ring on top
-        if (removeHover) {
-            g.setColor(new Color(220, 0, 0));
-            g.drawOval(location.x - size2 / 2 - 6, location.y - size2 / 2 - 6, size2 + 12, size2 + 12);
-            g.drawOval(location.x - size2 / 2 - 5, location.y - size2 / 2 - 5, size2 + 10, size2 + 10);
-        } else if (isRoot) {
-            g.setColor(new Color(0, 180, 0));
-            g.drawOval(location.x - size2 / 2 - 4, location.y - size2 / 2 - 4, size2 + 8, size2 + 8);
-            g.drawOval(location.x - size2 / 2 - 3, location.y - size2 / 2 - 3, size2 + 6, size2 + 6);
-        } else if (isCutpoint) {
-            g.setColor(new Color(255, 140, 0));
-            g.drawOval(location.x - size2 / 2 - 4, location.y - size2 / 2 - 4, size2 + 8, size2 + 8);
-            g.drawOval(location.x - size2 / 2 - 3, location.y - size2 / 2 - 3, size2 + 6, size2 + 6);
-        } else if (isIsolated()) {
-            g.setColor(Color.GRAY);
-            g.drawOval(location.x - size2 / 2 - 4, location.y - size2 / 2 - 4, size2 + 8, size2 + 8);
-        }
-
-        // 4) Name on top
-        g.setColor(Color.BLACK);
-        g.drawString(name, location.x, location.y);
     }
 }
