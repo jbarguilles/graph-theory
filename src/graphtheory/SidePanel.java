@@ -5,6 +5,11 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Rectangle;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
+import java.awt.event.InputEvent;
+import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.Collections;
 import java.util.IdentityHashMap;
@@ -19,6 +24,7 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextArea;
+import javax.swing.KeyStroke;
 import javax.swing.ListSelectionModel;
 import javax.swing.Scrollable;
 import javax.swing.event.ListSelectionEvent;
@@ -120,11 +126,17 @@ public class SidePanel extends JPanel implements Scrollable {
                 }
             }
         });
+        // Once clicked the list keeps focus for its arrow keys, but Ctrl+A/C/V/X fall through
+        // to the menu accelerators (Add Vertex, Greedy Coloring, ...) instead of list actions.
+        for (int key : new int[] {KeyEvent.VK_A, KeyEvent.VK_C, KeyEvent.VK_V, KeyEvent.VK_X}) {
+            pathList.getInputMap().put(KeyStroke.getKeyStroke(key, InputEvent.CTRL_DOWN_MASK), "none");
+        }
         pair.add(left(new JScrollPane(pathList)));
         add(pair);
 
         walkHeading.setFont(walkHeading.getFont().deriveFont(Font.BOLD));
         walkMessage.setForeground(new Color(200, 0, 0));
+        focusOnlyWhenClicked(walkText);
         walk.add(left(walkHeading));
         walk.add(left(walkText));
         walk.add(left(walkFacts));
@@ -281,15 +293,40 @@ public class SidePanel extends JPanel implements Scrollable {
         return p;
     }
 
+    /**
+     * Read-only text. Not focusable: a focused text area would consume the canvas's keys
+     * (arrows, Backspace, Ctrl+A/C) and Swing would hand it focus at startup or when a section hides.
+     */
     private static JTextArea textArea() {
         JTextArea t = new JTextArea();
         t.setEditable(false);
+        t.setFocusable(false);
         t.setLineWrap(true);
         t.setWrapStyleWord(true);
         t.setOpaque(false);
         t.setBorder(BorderFactory.createEmptyBorder(2, 0, 2, 0));
         t.setFont(new JLabel().getFont());
         return t;
+    }
+
+    /**
+     * Lets the user select and copy 't' after clicking into it, without it ever taking
+     * focus on its own: it is focusable only from a click until it loses focus for good.
+     */
+    private static void focusOnlyWhenClicked(final JTextArea t) {
+        t.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                t.setFocusable(true);
+                t.requestFocusInWindow();
+            }
+        });
+        t.addFocusListener(new FocusAdapter() {
+            @Override
+            public void focusLost(FocusEvent e) {
+                if (!e.isTemporary()) t.setFocusable(false);
+            }
+        });
     }
 
     private static <T extends javax.swing.JComponent> T left(T c) {

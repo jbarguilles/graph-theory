@@ -107,6 +107,9 @@ public class Canvas {
 
         canvas = new CanvasPane();
         canvas.setPreferredSize(new Dimension(width, height));
+        // The canvas holds keyboard focus so its key bindings and the menu accelerators reach it
+        // (a focused text component in the side panel would consume arrows, Backspace, Ctrl+A/C).
+        canvas.setFocusable(true);
         InputListener inputListener = new InputListener();
         canvas.addMouseListener(inputListener);
         canvas.addMouseMotionListener(inputListener);
@@ -168,6 +171,7 @@ public class Canvas {
         frame.pack();
         frame.setLocationRelativeTo(null);
         setVisible(true);
+        canvas.requestFocusInWindow();
         selectTool(Tools.VERTEX);
         updateTitle();
     }
@@ -668,7 +672,10 @@ public class Canvas {
         foundShape = null;
     }
 
-    /** Forgets the pair (Esc with the Pair tool, or picking a new first vertex) and unselects its vertices. */
+    /**
+     * Forgets the pair (Esc with the Pair tool, picking a new first vertex, or the Remove tool
+     * removing one of its vertices) and unselects its vertices.
+     */
     private void clearPair() {
         if (pairFirst != null) pairFirst.wasClicked = false;
         if (pairSecond != null) pairSecond.wasClicked = false;
@@ -746,6 +753,11 @@ public class Canvas {
                 }
             }
         });
+
+        // Also bound while the canvas has focus, ahead of the split pane's ancestor bindings
+        // (its arrow keys move the divider and would swallow ↑/↓ before the window bindings).
+        InputMap focused = canvas.getInputMap(JComponent.WHEN_FOCUSED);
+        for (KeyStroke k : im.keys()) focused.put(k, im.get(k));
     }
 
     /** Removes the walk's last step; undoing a trivial walk clears it. */
@@ -902,6 +914,8 @@ public class Canvas {
             String before = snapshot();
             handleClick(e);
             afterEdit(before);
+            // afterEdit may drop a found walk the edit no longer fits; show that now, not on the next mouse move.
+            refresh();
         }
 
         private void handleClick(MouseEvent e) {
@@ -913,7 +927,6 @@ public class Canvas {
                         vertexList.add(v);
                         markGraphDirty();
                         updateHover(e.getX(), e.getY());
-                        refresh();
                         break;
                     }
                     case 9: {
@@ -922,7 +935,6 @@ public class Canvas {
                         } else if (SwingUtilities.isLeftMouseButton(e)) {
                             handleWalkClick(e.getX(), e.getY());
                         }
-                        refresh();
                         break;
                     }
                     case 6: {
@@ -942,7 +954,6 @@ public class Canvas {
                                 v.wasClicked = true;
                             }
                         }
-                        refresh();
                         break;
                     }
                     case 4: {
@@ -976,7 +987,6 @@ public class Canvas {
                             markGraphDirty();
 
                             updateHover(e.getX(), e.getY());
-                            refresh();
                             break;
                         }
 
@@ -998,7 +1008,6 @@ public class Canvas {
                             markGraphDirty();
 
                             updateHover(e.getX(), e.getY());
-                            refresh();
                         }
                         break;
                     }
@@ -1008,7 +1017,6 @@ public class Canvas {
                         Edge target = edgeAt(e.getX(), e.getY());
                         if (target != null) {
                             editEdgeWeight(target);
-                            refresh();
                         }
                         break;
                     }
@@ -1017,13 +1025,11 @@ public class Canvas {
                         Vertex hitV = vertexAt(e.getX(), e.getY());
                         if (hitV != null) {
                             renameVertex(hitV);
-                            refresh();
                             break;
                         }
                         Edge hitE = edgeAt(e.getX(), e.getY());
                         if (hitE != null) {
                             editEdgeWeight(hitE);
-                            refresh();
                         }
                         break;
                     }
@@ -1048,7 +1054,6 @@ public class Canvas {
                         }
 
                         updateHover(e.getX(), e.getY());
-                        refresh();
                         break;
                     }
                 }
@@ -1077,6 +1082,7 @@ public class Canvas {
 
         @Override
         public void mousePressed(MouseEvent e) {
+            canvas.requestFocusInWindow();
             if (selectedWindow == 0) pressBefore = snapshot();
             if (selectedWindow == 0 && vertexList.size() > 0) {
                 switch (selectedTool) {

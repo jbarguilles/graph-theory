@@ -184,4 +184,26 @@ public class SidePanelTest {
                 0, 0, r.x + 1, r.y + 1, 0, false);
         assertEquals(p.pathList.getModel().getElementAt(1), p.pathList.getToolTipText(e));
     }
+
+    @Test
+    public void readOnlyText_neverTakesKeyboardFocusFromTheCanvas() {
+        SidePanel p = panel();
+        assertFalse(p.hint.isFocusable());
+        assertFalse(p.pairFacts.isFocusable());
+        assertFalse(p.walkFacts.isFocusable());
+        assertFalse(p.walkMessage.isFocusable());
+        // The walk is copyable, but only once the user clicks into it.
+        assertFalse(p.walkText.isFocusable());
+        p.walkText.dispatchEvent(new java.awt.event.MouseEvent(p.walkText, java.awt.event.MouseEvent.MOUSE_PRESSED,
+                0, java.awt.event.InputEvent.BUTTON1_DOWN_MASK, 1, 1, 1, false, java.awt.event.MouseEvent.BUTTON1));
+        assertTrue(p.walkText.isFocusable());
+    }
+
+    @Test
+    public void pathList_letsCtrlLettersThroughToTheMenu() {
+        SidePanel p = panel();
+        javax.swing.KeyStroke ctrlA = javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_A,
+                java.awt.event.InputEvent.CTRL_DOWN_MASK);
+        assertEquals("none", p.pathList.getInputMap().get(ctrlA));
+    }
 }
