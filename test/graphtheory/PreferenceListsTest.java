@@ -38,6 +38,25 @@ public class PreferenceListsTest {
     }
 
     @Test
+    public void sync_isIdempotent() {
+        a.preferences = new Vector<Vertex>(Arrays.asList(c, b));
+        List<Vertex> all = vs(a, b, c, d);
+        List<Edge> edges = es(und(a, b), und(a, c), und(a, d));
+        PreferenceLists.sync(all, edges);
+        List<Vertex> once = new Vector<Vertex>(a.preferences);
+        PreferenceLists.sync(all, edges);
+        assertEquals(once, a.preferences);
+        assertEquals(Arrays.asList(c, b, d), a.preferences);
+    }
+
+    @Test
+    public void sync_tidiesMessyList_duplicatesNonNeighboursAndArcIn() {
+        a.preferences = new Vector<Vertex>(Arrays.asList(b, b, d));
+        PreferenceLists.sync(vs(a, b, c, d), es(und(a, b), arc(c, a)));
+        assertEquals(Arrays.asList(b, c), a.preferences);
+    }
+
+    @Test
     public void sync_noNeighboursLeft_meansNoList() {
         a.preferences = new Vector<Vertex>(Arrays.asList(b));
         PreferenceLists.sync(vs(a, b), es());

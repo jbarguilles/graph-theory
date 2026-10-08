@@ -43,6 +43,7 @@ public final class PreferenceLists {
         return out;
     }
 
+    /** Whether any vertex has a preference list (decides the graph file's version). */
     public static boolean any(List<Vertex> vertices) {
         for (Vertex v : vertices) if (v.preferences != null) return true;
         return false;
