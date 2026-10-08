@@ -16,7 +16,6 @@ import java.awt.event.WindowEvent;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.awt.event.KeyEvent;
 import java.util.List;
 import java.util.Set;
@@ -28,8 +27,12 @@ public class Canvas {
 
     public JFrame frame;
     private CanvasPane canvas;
-    private JScrollPane propertiesScroll;
-    private JPanel propertiesContent;
+    private PropertiesPanel propertiesPanel;
+    // The report the Properties tab shows, and the graph text + proposer it was built from.
+    private PropertiesReport report;
+    private String reportKey;
+    // A vertex on the side that proposes for stable matching (analysis; not saved).
+    private Vertex proposer;
     private Color backgroundColour;
     private int selectedTool;
     private int selectedWindow;
@@ -80,12 +83,6 @@ public class Canvas {
     private GraphShape foundShape = null;
 
     private SidePanel sidePanel;
-
-    // Size of the graph picture at the top left of the Properties tab.
-    private static final int THUMB_W = 400;
-    private static final int THUMB_H = 300;
-    // Plot width of each degree distribution chart on the Properties tab.
-    private static final int DIST_PLOT_W = 360;
 
     public Canvas(String appName, int width, int height, Color bgColour) {
         this.appName = appName;
@@ -141,14 +138,22 @@ public class Canvas {
         graphPanel.add(palette, BorderLayout.WEST);
         graphPanel.add(split, BorderLayout.CENTER);
 
-        buildPropertiesPanel();
-        // Without this the tab would take the (huge) preferred size of the properties content.
-        propertiesScroll.setPreferredSize(new Dimension(width, height));
+        propertiesPanel = new PropertiesPanel(new PropertiesPanel.Listener() {
+            public void proposerChosen(Vertex p) {
+                proposer = p;
+                computeProperties();
+            }
+
+            public void editPreferences() {
+                editPreferenceLists();
+            }
+        });
+        propertiesPanel.setPreferredSize(new Dimension(width, height));
 
         tabs = new JTabbedPane();
         tabs.setFocusable(false);
         tabs.addTab("Graph", graphPanel);
-        tabs.addTab("Properties", propertiesScroll);
+        tabs.addTab("Properties", propertiesPanel);
         tabs.addChangeListener(new ChangeListener() {
             public void stateChanged(ChangeEvent e) {
                 onTabChanged();
@@ -195,6 +200,8 @@ public class Canvas {
         redoItem = addItem(edit, "Redo", KeyStroke.getKeyStroke(KeyEvent.VK_Y, KeyEvent.CTRL_DOWN_MASK));
         edit.addSeparator();
         addItem(edit, "Remove All", null);
+        edit.addSeparator();
+        addItem(edit, "Preference Lists...", null);
 
         JMenu tools = new JMenu("Tools");
         for (final int tool : Tools.ORDER) {
@@ -211,7 +218,8 @@ public class Canvas {
         JMenu extras = new JMenu("Extras");
         addItem(extras, "Auto Arrange Vertices", null);
         addItem(extras, "Show Induced Subgraph", null);
-        addItem(extras, "Show Greedy Coloring", KeyStroke.getKeyStroke(KeyEvent.VK_C, KeyEvent.CTRL_DOWN_MASK));
+        addItem(extras, "Show Greedy Coloring", KeyStroke.getKeyStroke(KeyEvent.VK_C,
+                KeyEvent.CTRL_DOWN_MASK | KeyEvent.SHIFT_DOWN_MASK));
         addItem(extras, "Clear Coloring", null);
         extras.addSeparator();
         for (String find : new String[] {"Find Euler Trail", "Find Euler Tour",
@@ -259,10 +267,12 @@ public class Canvas {
         clearHover();
         if (selectedWindow == 1) computeProperties();
         refresh();
+        if (selectedWindow == 0) canvas.requestFocusInWindow();
     }
 
-    /** The graph as .graph text: the unit of undo, saving and "unsaved changes". */
+    /** The graph as .graph text: the unit of undo, saving and "unsaved changes". Brings preference lists in step first. */
     private String snapshot() {
+        PreferenceLists.sync(vertexList, edgeList);
         return GraphFile.write(vertexList, edgeList);
     }
 
@@ -486,25 +496,39 @@ public class Canvas {
         JOptionPane.showMessageDialog(frame, message, title, JOptionPane.ERROR_MESSAGE);
     }
 
-    /** Recomputes what the Properties tab shows. */
+    /** Rebuilds the Properties report if the graph or the proposing side changed since the last one. */
     private void computeProperties() {
-        if (vertexList.size() > 0) {
-            gP.generateAdjacencyMatrix(vertexList, edgeList);
-
-            gP.vertexConnectivity(vertexList);
-            gP.edgeConnectivity(vertexList, edgeList);
-
-            gP.generateDistanceMatrix(vertexList);
-            gP.displayContainers(vertexList);
+        recomputeGraphProperties();   // cutpoints, read by the Vertices table
+        if (proposer != null && !vertexList.contains(proposer)) proposer = null;
+        String key = snapshot() + "\u0000" + (proposer == null ? "" : proposer.name);
+        if (!key.equals(reportKey)) {
+            report = new PropertiesReport(vertexList, edgeList, proposer);
+            reportKey = key;
         }
-        refreshPropertiesScrollSize();
+        propertiesPanel.display(report);
+    }
+
+    /** Edit > Preference Lists... and the Overview's button: OK is one undoable edit; Cancel records nothing. */
+    private void editPreferenceLists() {
+        PreferenceLists.sync(vertexList, edgeList);
+        PreferenceEditor editor = new PreferenceEditor(vertexList, edgeList);
+        if (editor.vertices().isEmpty()) {
+            JOptionPane.showMessageDialog(frame, "Add some edges first: a preference list ranks a vertex's neighbours.",
+                    "Preference Lists", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        if (!PreferencesDialog.edit(frame, editor)) return;
+        String before = snapshot();
+        editor.apply();
+        afterEdit(before);
+        refresh();
     }
 
     private void updateStatus() {
         if (statusHint == null) return;
         statusHint.setText(selectedWindow == 0
-                ? Tools.hint(selectedTool)
-                : "Properties of the current graph. Switch to the Graph tab to edit.");
+                ? Tools.hint(selectedTool) + "  (Ctrl+Shift+C: greedy colouring)"
+                : "Ctrl+C copies the selected cells · Ctrl+Shift+C colours the graph greedily · switch to the Graph tab to edit.");
         statusCounts.setText(vertexList.size() + " vertices \u00b7 " + edgeList.size() + " edges");
     }
 
@@ -514,107 +538,6 @@ public class Canvas {
                 + "Based on Graph Theory SY08-09 Term3 by Team DGLSS (v0.5).\n"
                 + "Extended by jbarguilles and rcoporto.",
                 "About " + appName, JOptionPane.INFORMATION_MESSAGE);
-    }
-
-    /** The graph fitted into a box, with the minimum vertex and edge cuts marked. */
-    private void drawThumbnail(Graphics2D g, int x, int y, int w, int h) {
-        Graphics2D t = (Graphics2D) g.create();
-        try {
-            t.clipRect(x, y, w, h);
-            t.translate(x, y);
-            t.setColor(backgroundColour);
-            t.fillRect(0, 0, w, h);
-            t.transform(GraphRenderer.fit(vertexList, w, h, 40));
-            GraphRenderer.Options o = new GraphRenderer.Options();
-            o.cutVertices = new HashSet<Vertex>(gP.minVertexCut);
-            o.cutEdges = new HashSet<Edge>(gP.minEdgeCut);
-            GraphRenderer.paint(t, vertexList, edgeList, o);
-        } finally {
-            t.dispose();
-        }
-        g.setColor(Color.BLACK);
-        g.drawRect(x, y, w, h);
-    }
-
-    private void buildPropertiesPanel() {
-        propertiesContent = new JPanel() {
-            @Override
-            public void paintComponent(Graphics g) {
-                super.paintComponent(g);
-                Graphics2D g2 = (Graphics2D) g;
-
-                int w = getWidth();
-                int h = getHeight();
-                g2.setColor(Color.WHITE);
-                g2.fillRect(0, 0, w, h);
-
-                drawThumbnail(g2, 10, 10, THUMB_W, THUMB_H);
-                g2.setStroke(new BasicStroke(1f));
-                g2.setFont(getFont());
-
-                int rightX = THUMB_W + 60;
-                int adjY = 50;
-                gP.drawAdjacencyMatrix(g2, vertexList, rightX, adjY);
-                int adjHeight = (vertexList.size() + 1) * 20 + 30;
-
-                int distY = adjY + adjHeight + 20;
-                gP.drawDistanceMatrix(g2, vertexList, rightX, distY);
-                int distHeight = (vertexList.size() + 1) * 20 + 30;
-
-                int summaryY = distY + distHeight + 20;
-                int summaryHeight = gP.drawGraphSummary(g2, vertexList, edgeList, rightX, summaryY);
-
-                int nodeY = THUMB_H + 90;
-                gP.drawNodePropertiesTable(g2, vertexList, 10, nodeY);
-                int nodeTableHeight = (vertexList.size() + 2) * 18 + 10;
-
-                int listY = nodeY + nodeTableHeight + 20;
-                int listHeight = gP.drawAdjacencyList(g2, vertexList, 10, listY);
-
-                int degreeY = listY + listHeight + 30;
-                gP.drawDegreeDistributions(g2, vertexList, edgeList, 10, degreeY, DIST_PLOT_W);
-
-                int captionY = Math.max(
-                        nodeY + (vertexList.size() + 2) * 18 + 40,
-                        summaryY + summaryHeight + 40);
-                captionY = Math.max(captionY, h - 40);
-
-                g2.setColor(Color.BLACK);
-                g2.setFont(g2.getFont().deriveFont(20f));
-            }
-        };
-        propertiesContent.setBackground(Color.WHITE);
-
-        propertiesScroll = new JScrollPane(propertiesContent);
-        propertiesScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
-        propertiesScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-        propertiesScroll.getVerticalScrollBar().setUnitIncrement(16);
-    }
-
-    private void refreshPropertiesScrollSize() {
-        if (propertiesContent == null) return;
-
-        int matrixRows = vertexList.size() + 1;
-        int matrixHeight = matrixRows * 20 + 30;
-
-        int rightHeight = 50
-                + matrixHeight + 20
-                + matrixHeight + 20
-                + 34 * 16 + 20;
-        int leftHeight = 10
-                       + THUMB_H + 20
-                       + (vertexList.size() + 2) * 18 + 30   // node table
-                       + (vertexList.size() + 1) * 18 + 20   // adjacency list
-                       + GraphProperties.degreeDistributionsHeight(edgeList)
-                       + 80;
-
-        int neededHeight = Math.max(rightHeight, leftHeight) + 60;
-        neededHeight = Math.max(neededHeight, height);
-        int neededWidth = Math.max(width + 40, THUMB_W + 60 + 700);
-
-        propertiesContent.setPreferredSize(new Dimension(neededWidth, neededHeight));
-        propertiesContent.revalidate();
-        propertiesContent.repaint();
     }
 
     private void updateHover(int mx, int my) {
@@ -759,7 +682,7 @@ public class Canvas {
         });
 
         // Also bound while the canvas has focus, ahead of the split pane's ancestor bindings
-        // (its arrow keys move the divider and would swallow ↑/↓ before the window bindings).
+        // (its arrow keys move the divider and would swallow Up/Down before the window bindings).
         InputMap focused = canvas.getInputMap(JComponent.WHEN_FOCUSED);
         for (KeyStroke k : im.keys()) focused.put(k, im.get(k));
     }
@@ -822,7 +745,7 @@ public class Canvas {
     }
 
     /**
-     * Extras > Find …: switches to the Build Walk tool on the Graph window and
+     * Extras > Find ...: switches to the Build Walk tool on the Graph window and
      * loads the walk found, or says none exists. kind is e.g. "Euler Tour".
      */
     private void findTraversal(String kind) {
@@ -1277,6 +1200,8 @@ public class Canvas {
                 redo();
             } else if (command.equals("Remove All")) {
                 removeAll();
+            } else if (command.equals("Preference Lists...")) {
+                editPreferenceLists();
             } else if (command.equals("New")) {
                 newGraph();
             } else if (command.equals("Open...")) {
@@ -1310,9 +1235,6 @@ public class Canvas {
         applyHighlights();
         updateSidePanel();
         canvas.repaint();
-        if (propertiesContent != null) {
-            propertiesContent.repaint();
-        }
         updateStatus();
     }
 
