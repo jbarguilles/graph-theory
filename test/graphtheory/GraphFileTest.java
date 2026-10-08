@@ -206,10 +206,28 @@ public class GraphFileTest {
 
     @Test
     public void read_preferMustNameExactlyTheNeighbours() {
-        assertRejected("Line 7: 'a' must rank exactly its neighbours: b, c",
+        assertRejected("Line 7: 'a' must rank each of its neighbours exactly once: b, c",
                 "graph-theory 2", "vertex a", "vertex b", "vertex c", "edge a b", "edge c a", "prefer a b");
-        assertRejected("Line 5: 'a' must rank exactly its neighbours: b",
+        assertRejected("Line 5: 'a' must rank each of its neighbours exactly once: b",
                 "graph-theory 2", "vertex a", "vertex b", "edge a b", "prefer a b b");
+    }
+
+    @Test
+    public void read_preferForVertexWithNoNeighbours_rejected() {
+        assertRejected("Line 4: 'a' has no neighbours, so it cannot have a prefer line",
+                "graph-theory 2", "vertex a", "vertex b", "prefer a b");
+    }
+
+    @Test
+    public void read_preferNamingUnknownVertex_rejected() {
+        assertRejected("Line 5: unknown vertex 'q' (declare it with a vertex line first)",
+                "graph-theory 2", "vertex a", "vertex b", "edge a b", "prefer a q");
+    }
+
+    @Test
+    public void read_preferAcceptsAnArcInNeighbour() throws Exception {
+        GraphFile.Data d = read("graph-theory 2", "vertex a", "vertex c", "arc c a", "prefer a c");
+        assertEquals(java.util.Arrays.asList(d.vertices.get(1)), d.vertices.get(0).preferences);
     }
 
     @Test

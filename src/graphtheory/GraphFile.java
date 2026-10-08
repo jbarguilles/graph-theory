@@ -1,6 +1,8 @@
 package graphtheory;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Vector;
@@ -75,8 +77,8 @@ public final class GraphFile {
         boolean sawHeader = false;
         int version = 0;
         boolean sawPrefer = false;
-        List<String[]> prefers = new java.util.ArrayList<String[]>();
-        List<Integer> preferLines = new java.util.ArrayList<Integer>();
+        List<String[]> prefers = new ArrayList<String[]>();
+        List<Integer> preferLines = new ArrayList<Integer>();
 
         for (int i = 0; i < lines.length; i++) {
             int lineNo = i + 1;
@@ -99,13 +101,18 @@ public final class GraphFile {
                 sawHeader = true;
             } else if (t[0].equals("vertex") || t[0].equals("edge") || t[0].equals("arc")) {
                 if (sawPrefer) {
-                    throw new FormatException(lineNo, "vertex, edge and arc lines must come before prefer lines");
+                    throw new FormatException(lineNo,
+                            "vertex, edge and arc lines must come before prefer lines");
                 }
                 if (t[0].equals("vertex")) readVertex(t, lineNo, data, byName, rootLine);
                 else readEdge(t, lineNo, data, byName);
             } else if (t[0].equals("prefer")) {
-                if (version < 2) throw new FormatException(lineNo, "prefer lines need the header '" + HEADER_V2 + "'");
-                if (t.length < 3) throw new FormatException(lineNo, "expected 'prefer <vertex> <neighbour> ...'");
+                if (version < 2) {
+                    throw new FormatException(lineNo, "prefer lines need the header '" + HEADER_V2 + "'");
+                }
+                if (t.length < 3) {
+                    throw new FormatException(lineNo, "expected 'prefer <vertex> <neighbour> ...'");
+                }
                 sawPrefer = true;
                 prefers.add(t);
                 preferLines.add(lineNo);
@@ -127,16 +134,23 @@ public final class GraphFile {
             String[] t = prefers.get(i);
             int lineNo = lines.get(i);
             Vertex v = lookup(t[1], lineNo, byName);
-            if (v.preferences != null) throw new FormatException(lineNo, "'" + v.name + "' already has a prefer line");
+            if (v.preferences != null) {
+                throw new FormatException(lineNo, "'" + v.name + "' already has a prefer line");
+            }
+            List<Vertex> nbrs = PreferenceLists.neighboursOf(v, data.edges);
+            if (nbrs.isEmpty()) {
+                throw new FormatException(lineNo,
+                        "'" + v.name + "' has no neighbours, so it cannot have a prefer line");
+            }
             Vector<Vertex> list = new Vector<Vertex>();
             for (int k = 2; k < t.length; k++) list.add(lookup(t[k], lineNo, byName));
-            List<Vertex> nbrs = PreferenceLists.neighboursOf(v, data.edges);
-            boolean exact = list.size() == nbrs.size() && new java.util.HashSet<Vertex>(list).size() == list.size()
+            boolean exact = list.size() == nbrs.size() && new HashSet<Vertex>(list).size() == list.size()
                     && list.containsAll(nbrs);
             if (!exact) {
                 StringBuilder names = new StringBuilder();
                 for (Vertex n : nbrs) names.append(names.length() > 0 ? ", " : "").append(n.name);
-                throw new FormatException(lineNo, "'" + v.name + "' must rank exactly its neighbours: " + names);
+                throw new FormatException(lineNo,
+                        "'" + v.name + "' must rank each of its neighbours exactly once: " + names);
             }
             v.preferences = list;
         }
