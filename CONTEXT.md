@@ -36,6 +36,10 @@ A connection between two vertices. Every edge is either **directed** or **undire
 - **Undirected edge** — has no source/destination distinction. Written as a set {a, b}.
 - **Self-loop** — an edge where `vertex1 == vertex2`.
 
+**Weight** — a non-negative whole number on every edge; 1 unless the user changes it.
+
+**Weighted graph** — a graph in which at least one edge has a weight other than 1. Only a weighted graph shows weights on the canvas, and then it shows all of them.
+
 ---
 
 ## Graph
@@ -45,6 +49,12 @@ A set of vertices and edges. This project supports **mixed graphs** — graphs c
 **Graph file** — a saved graph: its vertices (name, position, root) and edges (endpoints, direction, weight). It holds nothing derived or analytical — no cutpoints, coloring, walks or selected pair. Opening a file whose vertices lack positions arranges them, which counts as an unsaved change.
 
 **Unsaved changes** — any edit to what a graph file holds, including moving a vertex. Analysis (coloring, building walks, selecting a pair, viewing Properties) is never an unsaved change.
+
+**Minimum vertex cut** — a smallest set of vertices whose removal disconnects the graph; its size is the vertex connectivity.
+
+**Minimum edge cut** — a smallest set of edges whose removal disconnects the graph; its size is the edge connectivity.
+
+_Avoid_: "witness" for these — name the cut.
 
 ---
 
@@ -111,4 +121,6 @@ They follow the walk rules exactly, including direction, so there is no minimum 
 
 - **Graph window**: clicking a vertex shows its node properties in a fixed info box (degree, in-degree, out-degree, isolated, cutpoint, root).
 - **Properties tab**: shows a table of node properties for all vertices, plus the adjacency matrix and distance matrix. It sits beside the **Graph** tab and is recomputed whenever it is opened.
-- **Color coding on canvas**: root = green ring, cutpoint = orange ring, isolated = grey ring.
+- **Color coding on canvas**: root = green ring, cutpoint = orange ring, isolated = grey ring. A vertex is never both a cutpoint and isolated, but a root can be either, so it shows both rings at once (root outermost).
+- **One meaning per colour**: blue = selection (lighter on hover), red = about to be removed, purple = bridge, teal = built walk, amber = selected pair's path. Analysis results are highlighted, never shown by selecting things.
+- **Parallel edges and self-loops on canvas**: every edge is drawn separately, so parallel edges and repeated self-loops are each visible and clickable on their own.
