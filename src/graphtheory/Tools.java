@@ -27,7 +27,7 @@ public final class Tools {
             case GRAB:   return "Grab";
             case VERTEX: return "Vertex";
             case EDGE:   return "Edge";
-            case ARC:    return "Arc";
+            case ARC:    return "Directed Edge";
             case WEIGHT: return "Weight";
             case ROOT:   return "Root";
             case REMOVE: return "Remove";
