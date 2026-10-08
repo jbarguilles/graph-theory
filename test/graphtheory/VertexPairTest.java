@@ -107,4 +107,18 @@ public class VertexPairTest {
         }
         assertEquals(1, maxWidth);
     }
+
+    @Test
+    public void shortestDistance_parallelEdges_usesTheCheapest() {
+        Edge heavy = und(u, v);
+        heavy.setWeight(10);
+        Edge light = arc(u, v);
+        light.setWeight(1);
+        Edge heavier = arc(u, v);
+        heavier.setWeight(7);
+        EdgeRegistry.rebuild(edges(heavy, light, heavier));
+        assertEquals(1, new VertexPair(u, v).getShortestDistance());
+        // the arcs only go u -> v, so back the other way only the undirected edge counts
+        assertEquals(10, new VertexPair(v, u).getShortestDistance());
+    }
 }
