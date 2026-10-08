@@ -2,6 +2,7 @@ package graphtheory;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -13,14 +14,19 @@ public final class Structure {
 
     private Structure() {}
 
-    /** No loops, and no two edges on one pair except the opposite arcs (a, b) and (b, a). */
+    /**
+     * No loops, and no two edges on one pair except the opposite arcs (a, b) and (b, a).
+     * Respects direction only in allowing that arc pair.
+     */
     public static boolean isSimple(List<Vertex> vs, List<Edge> es) {
-        Map<String, List<Edge>> byPair = new HashMap<String, List<Edge>>();
+        Map<Integer, List<Edge>> byPair = new HashMap<Integer, List<Edge>>();
         Map<Vertex, Integer> idx = GraphMatrices.index(vs);
+        int n = vs.size();
         for (Edge e : es) {
-            if (e.vertex1 == e.vertex2) return false;
-            int i = idx.get(e.vertex1), j = idx.get(e.vertex2);
-            String key = Math.min(i, j) + "," + Math.max(i, j);
+            Integer i = idx.get(e.vertex1), j = idx.get(e.vertex2);
+            if (i == null || j == null) continue;
+            if (i.intValue() == j.intValue()) return false;
+            int key = Math.min(i, j) * n + Math.max(i, j);
             List<Edge> on = byPair.get(key);
             if (on == null) byPair.put(key, on = new ArrayList<Edge>());
             on.add(e);
@@ -34,11 +40,12 @@ public final class Structure {
         return true;
     }
 
+    /** At least one vertex and no edges. Direction does not matter. */
     public static boolean isEmpty(List<Vertex> vs, List<Edge> es) {
         return !vs.isEmpty() && es.isEmpty();
     }
 
-    /** Simple, and every two vertices joined both ways (an undirected edge, or both arcs). */
+    /** Simple, and every two vertices joined both ways (an undirected edge, or both arcs). Respects direction. */
     public static boolean isComplete(List<Vertex> vs, List<Edge> es) {
         if (vs.isEmpty() || !isSimple(vs, es)) return false;
         boolean[][] step = steps(vs, es);
@@ -48,7 +55,7 @@ public final class Structure {
         return true;
     }
 
-    /** Fraction of ordered pairs (u, v), u != v, with one edge leading u to v. null unless simple with n >= 2. */
+    /** Fraction of ordered pairs (u, v), u != v, with one edge leading u to v. null unless simple with n >= 2. Respects direction. */
     public static Double density(List<Vertex> vs, List<Edge> es) {
         int n = vs.size();
         if (n < 2 || !isSimple(vs, es)) return null;
@@ -67,6 +74,8 @@ public final class Structure {
      * undirected edges close a cycle.
      */
     public static boolean isCyclic(List<Vertex> vs, List<Edge> es) {
+        Map<Vertex, Integer> idx = GraphMatrices.index(vs);
+        es = within(idx, es);
         for (Edge e : es) if (e.vertex1 == e.vertex2) return true;
         for (int i = 0; i < es.size(); i++) {
             for (int j = 0; j < es.size(); j++) {
@@ -75,7 +84,6 @@ public final class Structure {
                 if (goes(x, x.vertex1, x.vertex2) && goes(y, x.vertex2, x.vertex1)) return true;
             }
         }
-        Map<Vertex, Integer> idx = GraphMatrices.index(vs);
         int n = vs.size();
         boolean[][] reach = steps(vs, es);
         for (int k = 0; k < n; k++) {
@@ -103,7 +111,7 @@ public final class Structure {
         Map<Vertex, Integer> idx = GraphMatrices.index(vs);
         int[] parent = new int[vs.size()];
         for (int i = 0; i < parent.length; i++) parent[i] = i;
-        for (Edge e : es) {
+        for (Edge e : within(idx, es)) {
             int x = Connectivity.find(parent, idx.get(e.vertex1)), y = Connectivity.find(parent, idx.get(e.vertex2));
             if (x == y) return false;
             parent[x] = y;
@@ -111,11 +119,12 @@ public final class Structure {
         return true;
     }
 
+    /** A forest that is connected. Direction does not matter. */
     public static boolean isTree(List<Vertex> vs, List<Edge> es) {
         return isForest(vs, es) && Connectivity.isConnected(vs, es);
     }
 
-    /** A tree with at least three vertices, one of them adjacent to all the others. */
+    /** A tree with at least three vertices, one of them adjacent to all the others. Direction does not matter. */
     public static boolean isStar(List<Vertex> vs, List<Edge> es) {
         if (vs.size() < 3 || !isTree(vs, es)) return false;
         for (Vertex c : vs) {
@@ -133,14 +142,14 @@ public final class Structure {
         int n = vs.size();
         List<List<Integer>> adj = new ArrayList<List<Integer>>();
         for (int i = 0; i < n; i++) adj.add(new ArrayList<Integer>());
-        for (Edge e : es) {
+        for (Edge e : within(idx, es)) {
             int i = idx.get(e.vertex1), j = idx.get(e.vertex2);
             if (i == j) return null;
             adj.get(i).add(j);
             adj.get(j).add(i);
         }
         int[] colour = new int[n];
-        java.util.Arrays.fill(colour, -1);
+        Arrays.fill(colour, -1);
         for (int s = 0; s < n; s++) {
             if (colour[s] >= 0) continue;
             colour[s] = 0;
@@ -165,7 +174,7 @@ public final class Structure {
         return sides;
     }
 
-    /** Simple, bipartite with two non-empty sides, every cross pair adjacent. */
+    /** Simple, bipartite with two non-empty sides, every cross pair adjacent. Direction does not matter. */
     public static boolean isCompleteBipartite(List<Vertex> vs, List<Edge> es) {
         List<List<Vertex>> sides = bipartiteSides(vs, es);
         if (sides == null || sides.get(0).isEmpty() || sides.get(1).isEmpty() || !isSimple(vs, es)) return false;
@@ -180,12 +189,21 @@ public final class Structure {
     private static boolean[][] steps(List<Vertex> vs, List<Edge> es) {
         Map<Vertex, Integer> idx = GraphMatrices.index(vs);
         boolean[][] step = new boolean[vs.size()][vs.size()];
-        for (Edge e : es) {
+        for (Edge e : within(idx, es)) {
             int i = idx.get(e.vertex1), j = idx.get(e.vertex2);
             step[i][j] = true;
             if (!e.directed) step[j][i] = true;
         }
         return step;
+    }
+
+    /** The edges whose two ends are both in the vertex list; any others are skipped. */
+    private static List<Edge> within(Map<Vertex, Integer> idx, List<Edge> es) {
+        List<Edge> in = new ArrayList<Edge>();
+        for (Edge e : es) {
+            if (idx.get(e.vertex1) != null && idx.get(e.vertex2) != null) in.add(e);
+        }
+        return in;
     }
 
     /** Edge e can be crossed from x to y. */

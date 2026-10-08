@@ -39,6 +39,7 @@ public class StructureTest {
         assertTrue(Structure.isComplete(vs(a, b, c), es(und(a, b), arc(a, c), arc(c, a), und(b, c))));
         assertFalse(Structure.isComplete(vs(a, b), es(arc(a, b))));
         assertTrue(Structure.isComplete(vs(a), es()));
+        assertFalse(Structure.isComplete(vs(), es()));
         assertFalse(Structure.isComplete(vs(a, b), es(und(a, b), und(a, b))));
     }
 
@@ -62,6 +63,8 @@ public class StructureTest {
         assertTrue(Structure.isCyclic(vs(a, b, c), es(und(a, b), und(b, c), und(c, a))));
         assertTrue(Structure.isCyclic(vs(a, b, c), es(und(a, b), und(b, c), arc(c, a))));
         assertFalse(Structure.isCyclic(vs(a, b), es(arc(a, b), arc(a, b))));
+        assertFalse(Structure.isCyclic(vs(a, b, c), es(und(a, b), arc(b, c), arc(a, c))));
+        assertTrue(Structure.isCyclic(vs(a, b, c, d), es(arc(a, b), und(b, c), arc(c, d), und(d, a))));
     }
 
     @Test
@@ -79,6 +82,14 @@ public class StructureTest {
         assertTrue(Structure.isStar(vs(a, b, c, d), es(und(a, b), arc(c, a), und(a, d))));
         assertFalse(Structure.isStar(vs(a, b, c, d), es(und(a, b), und(b, c), und(c, d))));
         assertFalse(Structure.isStar(vs(a, b), es(und(a, b))));
+        assertTrue(Structure.isStar(vs(a, b, c), es(und(a, b), und(b, c))));
+    }
+
+    @Test
+    public void edgesOutsideTheVertexListAreSkipped() {
+        assertTrue(Structure.isSimple(vs(a, b), es(und(a, b), und(c, d))));
+        assertFalse(Structure.isCyclic(vs(a, b), es(und(a, b), und(c, c))));
+        assertTrue(Structure.isForest(vs(a, b), es(und(a, b), und(c, d))));
     }
 
     @Test
@@ -89,6 +100,9 @@ public class StructureTest {
         assertNull(Structure.bipartiteSides(vs(a, b, c), es(und(a, b), und(b, c), und(c, a))));
         assertNull(Structure.bipartiteSides(vs(a), es(und(a, a))));
         assertNotNull(Structure.bipartiteSides(vs(a), es()));
+        List<List<Vertex>> none = Structure.bipartiteSides(vs(), es());
+        assertTrue(none.get(0).isEmpty());
+        assertTrue(none.get(1).isEmpty());
     }
 
     @Test
@@ -96,5 +110,6 @@ public class StructureTest {
         assertTrue(Structure.isCompleteBipartite(vs(a, b, c), es(und(a, b), und(a, c))));
         assertFalse(Structure.isCompleteBipartite(vs(a, b, c, d), es(und(a, b), und(a, b), und(a, d), und(c, d))));
         assertFalse(Structure.isCompleteBipartite(vs(a), es()));
+        assertFalse(Structure.isCompleteBipartite(vs(a, b, c), es(und(a, b), und(a, b), und(a, c))));
     }
 }
