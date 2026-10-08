@@ -13,9 +13,6 @@ public class Edge {
     public int weight = 1;
     public boolean isBridge;
 
-    /** Set by GraphProperties.computeBlocks to identify which block this edge belongs to. */
-    public int blockId = -1;
-
     // Set by Canvas when the Remove Tool hovers over this edge.
     public boolean removeHover = false;
 

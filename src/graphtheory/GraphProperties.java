@@ -35,12 +35,6 @@ public class GraphProperties {
     public Vector<Edge> minEdgeCut = new Vector<Edge>();
     public int edgeConnectivityValue = 0;
 
-    /** Number of blocks computed by the last call to computeBlocks(). */
-    public int blockCount = 0;
-
-    /** List of blocks computed by the last call to computeBlocks(). */
-    public Vector<Vector<Edge>> blockList = new Vector<Vector<Edge>>();
-
     /** Colors assigned by the last call to greedyColoring(). Index = vertexList index. */
     public int[] vertexColors = new int[0];
 
@@ -380,47 +374,6 @@ public class GraphProperties {
         }
     }
 
-    // ---- Bridge detection (Tarjan) ----
-
-    public void computeBridges(Vector<Vertex> vList, Vector<Edge> eList) {
-        for (Edge e : eList) e.isBridge = false;
-        int n = vList.size();
-        int[] disc = new int[n];
-        int[] low  = new int[n];
-        boolean[] visited = new boolean[n];
-        int[] timer = {0};
-        Arrays.fill(disc, -1);
-        for (int i = 0; i < n; i++) {
-            if (!visited[i]) dfsBridge(i, -1, vList, eList, disc, low, visited, timer);
-        }
-    }
-
-    private void dfsBridge(int u, int parentEdge, Vector<Vertex> vList, Vector<Edge> eList,
-                           int[] disc, int[] low, boolean[] visited, int[] timer) {
-        visited[u] = true;
-        disc[u] = low[u] = timer[0]++;
-        for (int v : getAllNeighborIndices(u, vList)) {
-            if (v == u) continue;
-            int eIdx = findEdgeIndex(vList.get(u), vList.get(v), eList);
-            if (!visited[v]) {
-                dfsBridge(v, eIdx, vList, eList, disc, low, visited, timer);
-                low[u] = Math.min(low[u], low[v]);
-                if (low[v] > disc[u] && eIdx >= 0) eList.get(eIdx).isBridge = true;
-            } else if (eIdx != parentEdge) {
-                low[u] = Math.min(low[u], disc[v]);
-            }
-        }
-    }
-
-    private int findEdgeIndex(Vertex a, Vertex b, Vector<Edge> eList) {
-        for (int i = 0; i < eList.size(); i++) {
-            Edge e = eList.get(i);
-            if ((e.vertex1 == a && e.vertex2 == b) ||
-                (!e.directed && e.vertex1 == b && e.vertex2 == a)) return i;
-        }
-        return -1;
-    }
-
     // ---- Euler / Hamiltonian answers for the summary, cached per graph change ----
     // Same searches as the Find menu items, so the two never disagree (ADR 0003).
 
@@ -443,147 +396,6 @@ public class GraphProperties {
             cachedHamCycle = yesNo(Traversals.hamiltonianCycle(vList, eList) != null);
         }
         traversalSummaryValid = true;
-    }
-
-    // ---- Block / biconnected component (Tarjan stack-based) ----
-
-    public Vector<Vector<Edge>> computeBlocks(Vector<Vertex> vList, Vector<Edge> eList) {
-        int n = vList.size();
-        int[] disc = new int[n];
-        int[] low = new int[n];
-        int[] parent = new int[n];
-        boolean[] visited = new boolean[n];
-        int[] timer = {0};
-        Arrays.fill(disc, -1);
-        Arrays.fill(parent, -1);
-
-        Vector<Vector<Edge>> blocks = new Vector<Vector<Edge>>();
-        Vector<Edge> edgeStack = new Vector<Edge>();
-
-        for (int i = 0; i < n; i++) {
-            if (!visited[i]) {
-                dfsBlock(i, vList, eList, disc, low, parent, visited, timer,
-                         edgeStack, blocks);
-            }
-        }
-
-        if (!edgeStack.isEmpty()) {
-            Vector<Edge> last = new Vector<Edge>(edgeStack);
-            blocks.add(last);
-            edgeStack.clear();
-        }
-
-        for (int b = 0; b < blocks.size(); b++) {
-            for (Edge e : blocks.get(b)) {
-                e.blockId = b;
-            }
-        }
-        this.blockCount = blocks.size();
-        this.blockList = blocks;
-        return blocks;
-    }
-
-    private void dfsBlock(int u, Vector<Vertex> vList, Vector<Edge> eList,
-                          int[] disc, int[] low, int[] parent, boolean[] visited, int[] timer,
-                          Vector<Edge> edgeStack, Vector<Vector<Edge>> blocks) {
-        visited[u] = true;
-        disc[u] = low[u] = timer[0]++;
-        int children = 0;
-
-        for (int v : getAllNeighborIndices(u, vList)) {
-            if (v == u) continue;
-            Edge e = findEdge(vList.get(u), vList.get(v), eList);
-            if (e == null) continue;
-
-            if (!visited[v]) {
-                children++;
-                parent[v] = u;
-                edgeStack.add(e);
-                dfsBlock(v, vList, eList, disc, low, parent, visited, timer,
-                         edgeStack, blocks);
-                low[u] = Math.min(low[u], low[v]);
-
-                boolean isRootWithTwo = (parent[u] == -1 && children > 1);
-                boolean isArticulation = (parent[u] != -1 && low[v] >= disc[u]);
-                if (isRootWithTwo || isArticulation) {
-                    Vector<Edge> block = new Vector<Edge>();
-                    while (!edgeStack.isEmpty()) {
-                        Edge top = edgeStack.remove(edgeStack.size() - 1);
-                        block.add(top);
-                        if (top == e) break;
-                    }
-                    blocks.add(block);
-                }
-            } else if (v != parent[u] && disc[v] < disc[u]) {
-                edgeStack.add(e);
-                low[u] = Math.min(low[u], disc[v]);
-            }
-        }
-    }
-
-    private Edge findEdge(Vertex a, Vertex b, Vector<Edge> eList) {
-        for (Edge e : eList) {
-            if (e.vertex1 == a && e.vertex2 == b) return e;
-            if (!e.directed && e.vertex1 == b && e.vertex2 == a) return e;
-        }
-        return null;
-    }
-
-    public Set<Vertex> blockVertices(Vector<Edge> block) {
-        Set<Vertex> s = new HashSet<Vertex>();
-        for (Edge e : block) {
-            s.add(e.vertex1);
-            s.add(e.vertex2);
-        }
-        return s;
-    }
-
-    public int countNontrivialBlocks() {
-        int count = 0;
-        for (Vector<Edge> block : blockList) {
-            if (blockVertices(block).size() >= 3) count++;
-        }
-        return count;
-    }
-
-    public boolean hasMaximalBlocks() {
-        return blockCount > 0;
-    }
-
-    public String formatBlocks(int maxLen) {
-        if (blockList.isEmpty()) return "\u2014";
-        StringBuilder sb = new StringBuilder();
-        for (int b = 0; b < blockList.size(); b++) {
-            if (b > 0) sb.append(", ");
-            Vector<Edge> block = blockList.get(b);
-            Set<Vertex> verts = blockVertices(block);
-
-            List<Vertex> ordered = new ArrayList<Vertex>(verts);
-            ordered.sort(new Comparator<Vertex>() {
-                public int compare(Vertex a, Vertex c) {
-                    return a.name.compareTo(c.name);
-                }
-            });
-
-            sb.append("{");
-            for (int i = 0; i < ordered.size(); i++) {
-                if (i > 0) sb.append(", ");
-                sb.append(ordered.get(i).name);
-            }
-            sb.append("}");
-        }
-        String result = sb.toString();
-        if (result.length() > maxLen) {
-            result = result.substring(0, Math.max(0, maxLen - 3)) + "...";
-        }
-        return result;
-    }
-
-    public boolean isNonseparable(Vector<Vertex> vList) {
-        if (vList.size() < 2) return true;
-        if (!isConnected(vList)) return false;
-        for (Vertex v : vList) if (v.isCutpoint) return false;
-        return true;
     }
 
     // ---- Graph coloring ----
@@ -1513,23 +1325,6 @@ private boolean tryMatch(List<Vertex> order, int idx,
                 ? "\u2014"
                 : (isAcyclic(vList) ? "Acyclic" : "Cyclic");
 
-        String nontrivialCount = vList.isEmpty()
-                ? "0"
-                : ("" + countNontrivialBlocks());
-
-        String blocksStr = vList.isEmpty()
-                ? "\u2014"
-                : ("" + blockCount + " ("
-                    + countNontrivialBlocks() + " nontrivial)");
-
-        String blockVerticesStr = vList.isEmpty()
-                ? "\u2014"
-                : formatBlocks(160);
-
-        String nonsepStr = vList.size() < 2
-                ? "\u2014"
-                : (isNonseparable(vList) ? "Yes" : "No");
-
         int chi = chromaticNumber(vList);
         String chiStr = (vList.isEmpty()) ? "\u2014"
                       : (chi == -1 ? ">15 vertices" : "" + chi);
@@ -1564,10 +1359,6 @@ private boolean tryMatch(List<Vertex> order, int idx,
             "Complete: " + completeStr,
             "Simple: " + simpleStr,
             "Cyclic/Acyclic: " + cyclicStr,
-            "Blocks: " + blocksStr,
-            "Nontrivial blocks: " + nontrivialCount,
-            "Nonseparable: " + nonsepStr,
-            "Block vertices: " + blockVerticesStr,
             "Bridges: " + bridgeCount + (bridgeCount > 0 ? " (purple)" : ""),
             "Euler Trail: " + eulerTrail,
             "Euler Tour: " + eulerTour,
