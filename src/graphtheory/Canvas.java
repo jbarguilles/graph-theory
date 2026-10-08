@@ -84,6 +84,8 @@ public class Canvas {
     // Size of the graph picture at the top left of the Properties tab.
     private static final int THUMB_W = 400;
     private static final int THUMB_H = 300;
+    // Plot width of each degree distribution chart on the Properties tab.
+    private static final int DIST_PLOT_W = 360;
 
     public Canvas(String appName, int width, int height, Color bgColour) {
         this.appName = appName;
@@ -569,11 +571,10 @@ public class Canvas {
                 int nodeTableHeight = (vertexList.size() + 2) * 18 + 10;
 
                 int listY = nodeY + nodeTableHeight + 20;
-int listHeight = gP.drawAdjacencyList(g2, vertexList, 10, listY);
+                int listHeight = gP.drawAdjacencyList(g2, vertexList, 10, listY);
 
-int histY = listY + listHeight + 30;
-int histPlotW = Math.min(360, getWidth() - 140);
-gP.drawDegreeHistogram(g2, vertexList, 10, histY, histPlotW, 180);
+                int degreeY = listY + listHeight + 30;
+                gP.drawDegreeDistributions(g2, vertexList, edgeList, 10, degreeY, DIST_PLOT_W);
 
                 int captionY = Math.max(
                         nodeY + (vertexList.size() + 2) * 18 + 40,
@@ -603,11 +604,11 @@ gP.drawDegreeHistogram(g2, vertexList, 10, histY, histPlotW, 180);
                 + matrixHeight + 20
                 + 34 * 16 + 20;
         int leftHeight = 10
-               + THUMB_H + 20
-               + (vertexList.size() + 2) * 18 + 30       // node table
-               + (vertexList.size() + 1) * 18 + 20       // adjacency list
-               + 240                                     // degree histogram
-               + 80;
+                       + THUMB_H + 20
+                       + (vertexList.size() + 2) * 18 + 30   // node table
+                       + (vertexList.size() + 1) * 18 + 20   // adjacency list
+                       + GraphProperties.degreeDistributionsHeight(edgeList)
+                       + 80;
 
         int neededHeight = Math.max(rightHeight, leftHeight) + 60;
         neededHeight = Math.max(neededHeight, height);

@@ -26,6 +26,10 @@ A point in the graph. Has a name, a canvas location, and three neighbor lists:
 
 **Self-loop** — an edge whose two endpoints are the same vertex. A self-loop contributes 2 to the vertex's degree (undirected) or 1 each to in-degree and out-degree (directed).
 
+**Degree distribution** — for each k, the fraction of vertices whose degree is k. The **in-degree distribution** and **out-degree distribution** are the same for in-degree and out-degree. A graph with undirected edges, or with no edges, has a degree distribution; a graph with directed edges has in-degree and out-degree distributions; a mixed graph has all three.
+
+_Avoid_: one distribution of "total degree" (degree + in-degree + out-degree); it mixes edge kinds and is not a term here.
+
 ---
 
 ## Edge (Arc)
