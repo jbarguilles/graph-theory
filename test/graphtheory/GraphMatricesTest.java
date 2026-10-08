@@ -56,6 +56,52 @@ public class GraphMatricesTest {
     }
 
     @Test
+    public void weightedDistances_saturateInsteadOfOverflowing() {
+        int[][] d = GraphMatrices.weightedDistances(vs(a, b, c),
+                es(w(und(a, b), Integer.MAX_VALUE), w(und(b, c), Integer.MAX_VALUE)));
+        assertEquals(Integer.MAX_VALUE, d[0][2]);
+        assertEquals(Integer.MAX_VALUE, d[0][1]);
+    }
+
+    @Test
+    public void selfLoop_keepsDiagonalZero() {
+        List<Vertex> vs = vs(a, b);
+        List<Edge> es = es(und(a, a), arc(b, b), und(a, b));
+        assertEquals(0, GraphMatrices.distances(vs, es)[0][0]);
+        assertEquals(0, GraphMatrices.distances(vs, es)[1][1]);
+        assertEquals(0, GraphMatrices.weightedDistances(vs, es)[0][0]);
+        assertEquals(0, GraphMatrices.weightedDistances(vs, es)[1][1]);
+    }
+
+    @Test
+    public void weightedDistances_zeroWeightEdge() {
+        int[][] d = GraphMatrices.weightedDistances(vs(a, b), es(w(und(a, b), 0)));
+        assertEquals(0, d[0][1]);
+        assertEquals(0, d[1][0]);
+    }
+
+    @Test
+    public void weightedDistances_parallelEdgesTakeSmallest() {
+        int[][] d = GraphMatrices.weightedDistances(vs(a, b), es(w(und(a, b), 5), w(und(a, b), 2)));
+        assertEquals(2, d[0][1]);
+    }
+
+    @Test
+    public void adjacency_columnSumIsDegreePlusInDegree() {
+        // b: two undirected to a, undirected loop (2) -> degree 4; arc c->b -> in 1
+        int[][] m = GraphMatrices.adjacency(vs(a, b, c), es(und(a, b), und(a, b), und(b, b), arc(c, b)));
+        assertEquals(5, m[0][1] + m[1][1] + m[2][1]);
+    }
+
+    @Test
+    public void emptyGraph_givesEmptyMatrices() {
+        List<Vertex> none = vs();
+        assertEquals(0, GraphMatrices.adjacency(none, es()).length);
+        assertEquals(0, GraphMatrices.distances(none, es()).length);
+        assertEquals(0, GraphMatrices.weightedDistances(none, es()).length);
+    }
+
+    @Test
     public void weightedDistances_unreachable() {
         int[][] d = GraphMatrices.weightedDistances(vs(a, b), es(w(arc(b, a), 3)));
         assertEquals(GraphMatrices.UNREACHABLE, d[0][1]);

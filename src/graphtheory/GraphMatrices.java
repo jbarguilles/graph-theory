@@ -77,7 +77,7 @@ public final class GraphMatrices {
                 if (u < 0) break;
                 done[u] = true;
                 for (int[] st : steps.get(u)) {
-                    int nd = row[u] + st[1];
+                    int nd = (int) Math.min((long) row[u] + st[1], Integer.MAX_VALUE);
                     if (row[st[0]] == UNREACHABLE || nd < row[st[0]]) row[st[0]] = nd;
                 }
             }
@@ -100,6 +100,7 @@ public final class GraphMatrices {
         return steps;
     }
 
+    /** Each vertex's position in vs, matched by identity; shared by the other graph helpers. */
     static Map<Vertex, Integer> index(List<Vertex> vs) {
         Map<Vertex, Integer> idx = new HashMap<Vertex, Integer>();
         for (int i = 0; i < vs.size(); i++) idx.put(vs.get(i), i);
