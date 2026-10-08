@@ -15,8 +15,10 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.awt.event.KeyEvent;
+import java.util.List;
 import java.util.Set;
 import java.util.Vector;
 import javax.swing.event.ChangeEvent;
@@ -66,11 +68,15 @@ public class Canvas {
     private String walkMessage = null;
     private static final Color WALK_COLOR = new Color(0, 150, 150);
 
-    // Paths for the selected pair (Tools.PAIR), browsed one at a time
-    private Vector<Walk> pairPaths = null;
+    // The selected pair (Tools.PAIR): its paths and distances, and the path shown in amber
+    private PairSummary pairSummary = null;
     private int selectedPathIndex = 0;
     private static final Color PATH_COLOR = new Color(220, 160, 0);
-    private static final int PATH_ROWS = 6;
+
+    // The Find command (e.g. "Euler Tour") that produced currentWalk, or null for a built walk
+    private String foundKind = null;
+
+    private SidePanel sidePanel;
 
     // Size of the graph picture at the top left of the Properties tab.
     private static final int THUMB_W = 400;
@@ -108,9 +114,24 @@ public class Canvas {
                 selectTool(tool);
             }
         });
+        sidePanel = new SidePanel(new SidePanel.Listener() {
+            public void pathChosen(int index) {
+                choosePath(index);
+            }
+        });
+        JScrollPane sideScroll = new JScrollPane(sidePanel,
+                JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        sideScroll.setPreferredSize(new Dimension(SidePanel.WIDTH, height));
+        sideScroll.setBorder(BorderFactory.createEmptyBorder());
+        sideScroll.getVerticalScrollBar().setUnitIncrement(16);
+        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, canvas, sideScroll);
+        split.setResizeWeight(1.0);   // a bigger window widens the canvas; the panel keeps its width
+        split.setContinuousLayout(true);
+        split.setBorder(BorderFactory.createEmptyBorder());
+
         JPanel graphPanel = new JPanel(new BorderLayout());
         graphPanel.add(palette, BorderLayout.WEST);
-        graphPanel.add(canvas, BorderLayout.CENTER);
+        graphPanel.add(split, BorderLayout.CENTER);
 
         buildPropertiesPanel();
         // Without this the tab would take the (huge) preferred size of the properties content.
@@ -223,7 +244,7 @@ public class Canvas {
             pairedVertex1Index = -1;
             pairedVertex2Index = -1;
             currentPairVP = null;
-            pairPaths = null;
+            pairSummary = null;
         } else if (tool == Tools.WALK) {
             clearWalk();
         }
@@ -342,7 +363,7 @@ public class Canvas {
         pairedVertex1Index = -1;
         pairedVertex2Index = -1;
         currentPairVP = null;
-        pairPaths = null;
+        pairSummary = null;
         pressBefore = null;
         dragPoint = null;
         markGraphDirty();
@@ -649,15 +670,23 @@ public class Canvas {
         walkMessage = null;
     }
 
-    /** Recomputes the selected pair's path list and vertex-disjoint width. */
+    /** Recomputes the selected pair's summary (paths, distances) after the pair or the graph changes. */
     private void refreshPairPaths() {
         selectedPathIndex = 0;
-        if (currentPairVP == null) {
-            pairPaths = null;
-            return;
+        pairSummary = currentPairVP == null ? null
+                : new PairSummary(currentPairVP.vertex1, currentPairVP.vertex2, edgeList);
+    }
+
+    /** A row of the side panel's path list was clicked: show that path, with the Pair tool, keeping the pair. */
+    private void choosePath(int index) {
+        if (pairSummary == null || index < 0 || index >= pairSummary.paths.size()) return;
+        selectedPathIndex = index;
+        if (selectedTool != Tools.PAIR) {
+            // Not selectTool(): that runs the tool-switch logic; here only the active tool changes.
+            selectedTool = Tools.PAIR;
+            palette.setSelectedTool(Tools.PAIR);
         }
-        currentPairVP.generateVertexDisjointPaths();
-        pairPaths = currentPairVP.generateEdgePaths(edgeList);
+        refresh();
     }
 
     private void installKeyBindings() {
@@ -682,7 +711,7 @@ public class Canvas {
         am.put("pathPrev", new AbstractAction() {
             public void actionPerformed(ActionEvent e) {
                 if (selectedTool == 6 && selectedWindow == 0
-                        && pairPaths != null && selectedPathIndex > 0) {
+                        && pairSummary != null && selectedPathIndex > 0) {
                     selectedPathIndex--;
                     refresh();
                 }
@@ -692,8 +721,8 @@ public class Canvas {
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_DOWN, 0), "pathNext");
         am.put("pathNext", new AbstractAction() {
             public void actionPerformed(ActionEvent e) {
-                if (selectedTool == 6 && selectedWindow == 0 && pairPaths != null
-                        && selectedPathIndex < pairPaths.size() - 1) {
+                if (selectedTool == 6 && selectedWindow == 0 && pairSummary != null
+                        && selectedPathIndex < pairSummary.paths.size() - 1) {
                     selectedPathIndex++;
                     refresh();
                 }
@@ -772,14 +801,6 @@ public class Canvas {
             currentWalk = Traversals.hamiltonianCycle(vertexList, edgeList);
         }
         if (currentWalk == null) walkMessage = "No " + kind + " exists";
-    }
-
-    private static String truncate(String s, int max) {
-        return s.length() > max ? s.substring(0, max - 3) + "..." : s;
-    }
-
-    private static String yesNo(boolean b) {
-        return b ? "yes" : "no";
     }
 
     private Set<Vertex> connectedComponentOf(Vertex start) {
@@ -890,7 +911,7 @@ public class Canvas {
                                     pairedVertex1Index = idx;
                                     pairedVertex2Index = -1;
                                     currentPairVP = null;
-                                    pairPaths = null;
+                                    pairSummary = null;
                                     v.wasClicked = true;
                                 }
                             }
@@ -1276,6 +1297,7 @@ public class Canvas {
         recomputeGraphProperties();
         EdgeRegistry.rebuild(edgeList);
         applyHighlights();
+        updateSidePanel();
         canvas.repaint();
         if (propertiesContent != null) {
             propertiesContent.repaint();
@@ -1300,12 +1322,31 @@ public class Canvas {
                 ed.stepLabel = sb.toString();
             }
         }
-        if (selectedTool == 6 && pairPaths != null && !pairPaths.isEmpty()) {
-            for (Edge ed : pairPaths.get(selectedPathIndex).edges()) {
+        if (selectedTool == 6 && pairSummary != null && !pairSummary.paths.isEmpty()) {
+            for (Edge ed : pairSummary.paths.get(selectedPathIndex).edges()) {
                 ed.highlight = PATH_COLOR;
                 ed.stepLabel = null;
             }
         }
+    }
+
+    /** Hands the side panel what currently exists: selection, pair, walk. */
+    private void updateSidePanel() {
+        if (sidePanel == null) return;
+        SidePanel.Content c = new SidePanel.Content();
+        List<Vertex> selected = new ArrayList<Vertex>();
+        for (Vertex v : vertexList) {
+            if (v.wasClicked) selected.add(v);
+        }
+        c.selected = selected;
+        c.pair = pairSummary;
+        c.pathIndex = selectedTool == Tools.PAIR && pairSummary != null && !pairSummary.paths.isEmpty()
+                ? selectedPathIndex : -1;
+        c.walk = currentWalk;
+        c.foundKind = foundKind;
+        c.walkMessage = walkMessage;
+        c.weighted = Edge.isWeighted(edgeList);
+        sidePanel.display(c);
     }
 
     /** Grey dashed line from the pressed vertex to the mouse while dragging out an edge. */
@@ -1342,152 +1383,6 @@ public class Canvas {
         return frame.isVisible();
     }
 
-    private void drawInfoBox(Graphics g) {
-        Vertex clicked = null;
-        int selCount = 0;
-        for (Vertex v : vertexList) {
-            if (v.wasClicked) {
-                selCount++;
-                if (clicked == null) clicked = v;
-            }
-        }
-        if (clicked == null) return;
-
-        int x = 10, y = 10, w = 190, h = 158;
-        g.setColor(new Color(245, 245, 245));
-        g.fillRect(x, y, w, h);
-        g.setColor(Color.BLACK);
-        g.drawRect(x, y, w, h);
-
-        int ty = y + 16;
-        g.drawString("Selected: " + selCount + " vertex" + (selCount == 1 ? "" : "es"),
-                     x + 6, ty); ty += 16;
-        g.drawString("First: " + clicked.name,              x + 6, ty); ty += 16;
-        g.drawString("Degree: " + clicked.degree(),         x + 6, ty); ty += 16;
-        g.drawString("In-Degree: " + clicked.inDegree(),    x + 6, ty); ty += 16;
-        g.drawString("Out-Degree: " + clicked.outDegree(),  x + 6, ty); ty += 16;
-        g.drawString("Isolated: " + clicked.isIsolated(),   x + 6, ty); ty += 16;
-        g.drawString("Self-loop: " + clicked.hasSelfLoop(), x + 6, ty); ty += 16;
-        g.drawString("Cutpoint: " + clicked.isCutpoint,     x + 6, ty); ty += 16;
-        g.drawString("Root: " + clicked.isRoot,             x + 6, ty);
-    }
-
-    private void drawPairInfoBox(Graphics g) {
-        if (currentPairVP == null) return;
-
-        Vertex v1 = currentPairVP.vertex1;
-        Vertex v2 = currentPairVP.vertex2;
-
-        boolean adjacent = false;
-        for (Edge e : edgeList) {
-            if ((e.vertex1 == v1 && e.vertex2 == v2) ||
-                (!e.directed && e.vertex1 == v2 && e.vertex2 == v1)) {
-                adjacent = true; break;
-            }
-        }
-
-        int dist = currentPairVP.getShortestDistance();
-        boolean reachable = dist != -1;
-        Vector<Vertex> geodesic = currentPairVP.getShortestPath();
-
-        String geodesicStr = "";
-        if (geodesic != null) {
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < geodesic.size(); i++) {
-                if (i > 0) sb.append("\u2192");
-                sb.append(geodesic.get(i).name);
-            }
-            geodesicStr = sb.length() > 28 ? sb.substring(0, 25) + "..." : sb.toString();
-        }
-
-        int maxWidth = 0;
-        if (currentPairVP.VertexDisjointContainer != null) {
-            for (Vector<Vector<Vertex>> c : currentPairVP.VertexDisjointContainer) {
-                if (c.size() > maxWidth) maxWidth = c.size();
-            }
-        }
-
-        String pairLabel = v1.name + " \u2192 " + v2.name;
-        int pathCount = pairPaths != null ? pairPaths.size() : 0;
-        int rows = Math.min(PATH_ROWS, pathCount);
-
-        int x = 210, y = 10, w = 430;
-        int h = 15 * (8 + Math.max(rows, 1)) + 8;
-        g.setColor(new Color(240, 248, 255));
-        g.fillRect(x, y, w, h);
-        g.setColor(Color.BLACK);
-        g.drawRect(x, y, w, h);
-
-        int ty = y + 15;
-        int lx = x + 6;
-        g.drawString("Ordered pair: (" + pairLabel + ")",          lx, ty); ty += 15;
-        g.drawString("Adjacent: " + adjacent,                      lx, ty); ty += 15;
-        g.drawString("Reachable: " + reachable,                    lx, ty); ty += 15;
-        g.drawString("Geodesic dist (weighted): " + (reachable ? dist : "\u221E"), lx, ty); ty += 15;
-        if (!geodesicStr.isEmpty()) {
-            g.drawString("Geodesic path: " + geodesicStr,          lx, ty); ty += 15;
-        } else {
-            g.drawString("Geodesic path: N/A",                     lx, ty); ty += 15;
-        }
-        int simplePathCount = currentPairVP.pathList != null ? currentPairVP.pathList.size() : 0;
-        g.drawString("Simple paths (Walk\u2229no-repeat): " + simplePathCount, lx, ty); ty += 15;
-        g.drawString("Max vertex-disjoint width: " + maxWidth,     lx, ty); ty += 15;
-        g.drawString("Paths " + pairLabel + ": " + pathCount
-                + (pathCount > 1 ? "   (\u2191/\u2193 to browse)" : ""),     lx, ty); ty += 15;
-
-        if (pathCount == 0) {
-            g.drawString("  No path from " + v1.name + " to " + v2.name, lx, ty);
-            return;
-        }
-
-        int minLen = pairPaths.get(0).length();
-        int first = (selectedPathIndex / PATH_ROWS) * PATH_ROWS;
-        for (int i = first; i < Math.min(first + PATH_ROWS, pathCount); i++) {
-            Walk p = pairPaths.get(i);
-            if (i == selectedPathIndex && selectedTool == 6) {
-                g.setColor(new Color(255, 230, 160));
-                g.fillRect(x + 2, ty - 12, w - 4, 15);
-                g.setColor(Color.BLACK);
-            }
-            String row = (i + 1) + ". " + truncate(p.toString(), 40)
-                    + "  len " + p.length()
-                    + (p.length() == minLen ? "  \u2190 geodesic" : "");
-            g.drawString(row, lx, ty);
-            ty += 15;
-        }
-    }
-
-    private void drawWalkInfoBox(Graphics g) {
-        if (currentWalk == null && walkMessage == null) return;
-
-        // Near the bottom, but never up over the vertex info box (y 10 to 168) in a short window.
-        int x = 10, y = Math.max(180, canvasHeight() - 180), w = 360, h = 95;
-        g.setColor(new Color(235, 250, 250));
-        g.fillRect(x, y, w, h);
-        g.setColor(Color.BLACK);
-        g.drawRect(x, y, w, h);
-
-        int ty = y + 16;
-        int lx = x + 6;
-        if (currentWalk == null) {
-            g.drawString("Walk: (none)", lx, ty); ty += 16;
-        } else {
-            Walk w0 = currentWalk;
-            g.drawString("Walk: " + truncate(w0.toString(), 54), lx, ty); ty += 16;
-            g.drawString("Length: " + w0.length(), lx, ty); ty += 16;
-            g.drawString("Trail: " + yesNo(w0.isTrail())
-                    + "   Path: " + yesNo(w0.isPath()), lx, ty); ty += 16;
-            g.drawString("Closed: " + yesNo(w0.isClosed())
-                    + "   Circuit: " + yesNo(w0.isCircuit())
-                    + "   Cycle: " + yesNo(w0.isCycle()), lx, ty); ty += 16;
-        }
-        if (walkMessage != null) {
-            g.setColor(new Color(200, 0, 0));
-            g.drawString(walkMessage, lx, ty);
-            g.setColor(Color.BLACK);
-        }
-    }
-
     private class CanvasPane extends JPanel {
 
         @Override
@@ -1503,12 +1398,6 @@ public class Canvas {
             GraphRenderer.paint(g2, vertexList, edgeList, o);
             drawDragPreview(g2);
             drawWalkMarkers(g2);
-
-            g2.setStroke(new BasicStroke(1f));
-            g2.setFont(getFont());
-            drawInfoBox(g2);
-            drawPairInfoBox(g2);
-            drawWalkInfoBox(g2);
         }
     }
 }
