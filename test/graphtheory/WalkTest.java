@@ -238,4 +238,70 @@ public class WalkTest {
         assertEquals("{b,a}", Walk.edgeLabel(und(a, b), b));
         assertEquals("(a,b)", Walk.edgeLabel(arc(a, b), a));
     }
+
+    private static Walk walk(Vertex start, Edge... steps) {
+        Walk w = new Walk(start);
+        for (Edge e : steps) assertTrue("can't take " + e.vertex1.name + e.vertex2.name, w.extend(e));
+        return w;
+    }
+
+    @Test
+    public void weight_sumsEdgeWeights_countingRepeats() {
+        Vertex a = new Vertex("a", 0, 0), b = new Vertex("b", 0, 0);
+        Edge ab = new Edge(a, b, false);
+        ab.setWeight(4);
+        assertEquals(8, walk(a, ab, ab).weight());
+    }
+
+    @Test
+    public void weight_trivialWalk_isZero() {
+        assertEquals(0, new Walk(new Vertex("a", 0, 0)).weight());
+    }
+
+    @Test
+    public void kindName_trivialWalk_isPath() {
+        assertEquals("path", new Walk(new Vertex("a", 0, 0)).kindName());
+    }
+
+    @Test
+    public void kindName_openNoRepeatedVertex_isPath() {
+        Vertex a = new Vertex("a", 0, 0), b = new Vertex("b", 0, 0);
+        assertEquals("path", walk(a, new Edge(a, b, false)).kindName());
+    }
+
+    @Test
+    public void kindName_openRepeatedVertexNoRepeatedEdge_isTrail() {
+        Vertex a = new Vertex("a", 0, 0), b = new Vertex("b", 0, 0), c = new Vertex("c", 0, 0), d = new Vertex("d", 0, 0);
+        Edge ab = new Edge(a, b, false), bc = new Edge(b, c, false), ca = new Edge(c, a, false), ad = new Edge(a, d, false);
+        assertEquals("trail", walk(a, ab, bc, ca, ad).kindName());
+    }
+
+    @Test
+    public void kindName_openRepeatedEdge_isWalk() {
+        Vertex a = new Vertex("a", 0, 0), b = new Vertex("b", 0, 0), c = new Vertex("c", 0, 0);
+        Edge ab = new Edge(a, b, false), ac = new Edge(a, c, false);
+        assertEquals("walk", walk(a, ab, ab, ac).kindName());
+    }
+
+    @Test
+    public void kindName_backAndForthOnOneEdge_isClosedWalk() {
+        Vertex a = new Vertex("a", 0, 0), b = new Vertex("b", 0, 0);
+        Edge ab = new Edge(a, b, false);
+        assertEquals("closed walk", walk(a, ab, ab).kindName());
+    }
+
+    @Test
+    public void kindName_figureEight_isCircuit() {
+        Vertex a = new Vertex("a", 0, 0), b = new Vertex("b", 0, 0), c = new Vertex("c", 0, 0),
+               d = new Vertex("d", 0, 0), f = new Vertex("f", 0, 0);
+        Edge ab = new Edge(a, b, false), bc = new Edge(b, c, false), ca = new Edge(c, a, false),
+             ad = new Edge(a, d, false), df = new Edge(d, f, false), fa = new Edge(f, a, false);
+        assertEquals("circuit", walk(a, ab, bc, ca, ad, df, fa).kindName());
+    }
+
+    @Test
+    public void kindName_undirectedThenArcBack_isCycle() {
+        Vertex a = new Vertex("a", 0, 0), b = new Vertex("b", 0, 0);
+        assertEquals("cycle", walk(a, new Edge(a, b, false), new Edge(b, a, true)).kindName());
+    }
 }

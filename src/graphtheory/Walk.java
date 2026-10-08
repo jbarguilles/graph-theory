@@ -115,6 +115,22 @@ public class Walk {
         return new HashSet<Vertex>(allButLast).size() == allButLast.size();
     }
 
+    /** Sum of its edges' weights, counting repeats (CONTEXT.md, Weight of a walk). */
+    public int weight() {
+        int w = 0;
+        for (Edge e : edges) w += e.weight;
+        return w;
+    }
+
+    /**
+     * The most specific kind it is (CONTEXT.md, Kinds of Walk): "cycle", "circuit" or
+     * "closed walk" when closed, otherwise "path", "trail" or "walk".
+     */
+    public String kindName() {
+        if (isClosed()) return isCycle() ? "cycle" : isCircuit() ? "circuit" : "closed walk";
+        return isPath() ? "path" : isTrail() ? "trail" : "walk";
+    }
+
     /** e.g. "a -{a,b}-> b -(b,c)-> c". */
     @Override
     public String toString() {
