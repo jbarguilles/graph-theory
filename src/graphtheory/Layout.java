@@ -5,8 +5,8 @@ import java.util.List;
 /** Places vertices on the canvas. */
 public final class Layout {
 
-    /** Distance kept from the canvas edge: vertex radius (20) plus its property ring. */
-    public static final int MARGIN = 25;
+    /** Distance kept from the canvas edge: vertex radius plus its outer (root) ring. */
+    public static final int MARGIN = Vertex.RADIUS + 12;
 
     private Layout() {}
 

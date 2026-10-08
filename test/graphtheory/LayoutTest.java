@@ -16,10 +16,10 @@ public class LayoutTest {
     public void clampInto_pullsOutsideVerticesToTheMargin() {
         Vector<Vertex> vs = at(-50, 5000, 900, -3);
         Layout.clampInto(vs, 800, 600);
-        assertEquals(25, vs.get(0).location.x);
-        assertEquals(575, vs.get(0).location.y);
-        assertEquals(775, vs.get(1).location.x);
-        assertEquals(25, vs.get(1).location.y);
+        assertEquals(30, vs.get(0).location.x);
+        assertEquals(570, vs.get(0).location.y);
+        assertEquals(770, vs.get(1).location.x);
+        assertEquals(30, vs.get(1).location.y);
     }
 
     @Test

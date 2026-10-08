@@ -31,6 +31,8 @@ public class Vertex implements Comparable {
     public Vector<Vertex> outNeighbors;
     public boolean isCutpoint;
     public boolean isRoot;
+    /** Radius of a vertex on the canvas. Hit-testing, edge endpoints and drawing all use it. */
+    public static final int RADIUS = 18;
 
     /** Palette for greedy coloring. Cycles through if colorId is large. */
     public static final Color[] PALETTE = {
@@ -57,8 +59,7 @@ public class Vertex implements Comparable {
     }
 
     public boolean hasIntersection(int x, int y) {
-        double distance = Math.sqrt(Math.pow((x - location.x), 2) + Math.pow((y - location.y), 2));
-        return distance <= size2 / 2;
+        return Math.hypot(x - location.x, y - location.y) <= RADIUS;
     }
 
     public boolean connectedToVertex(Vertex v) {

@@ -95,4 +95,21 @@ public class VertexTest {
         v.outNeighbors.add(new Vertex("a", 0, 0));
         assertFalse(v.isIsolated());
     }
+
+    @Test
+    public void hasIntersection_insideRadius_true() {
+        Vertex v = new Vertex("v", 100, 100);
+        assertTrue(v.hasIntersection(100 + Vertex.RADIUS, 100));
+    }
+
+    @Test
+    public void hasIntersection_justOutsideRadius_false() {
+        Vertex v = new Vertex("v", 100, 100);
+        assertFalse(v.hasIntersection(100 + Vertex.RADIUS + 1, 100));
+    }
+
+    @Test
+    public void radius_is18() {
+        assertEquals(18, Vertex.RADIUS);
+    }
 }
