@@ -4,6 +4,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -37,7 +38,7 @@ public final class Connectivity {
             if (i != null && j != null) parent[find(parent, i)] = find(parent, j);
         }
         List<List<Vertex>> out = new ArrayList<List<Vertex>>();
-        Map<Integer, List<Vertex>> byRoot = new java.util.HashMap<Integer, List<Vertex>>();
+        Map<Integer, List<Vertex>> byRoot = new HashMap<Integer, List<Vertex>>();
         for (int i = 0; i < vs.size(); i++) {
             int r = find(parent, i);
             List<Vertex> comp = byRoot.get(r);
@@ -101,8 +102,8 @@ public final class Connectivity {
         Map<Vertex, Integer> idx = GraphMatrices.index(vs);
         int[][] cap = new int[n][n];
         for (Edge e : es) {
-            int i = idx.get(e.vertex1), j = idx.get(e.vertex2);
-            if (i == j) continue;
+            Integer i = idx.get(e.vertex1), j = idx.get(e.vertex2);
+            if (i == null || j == null || i.equals(j)) continue;
             cap[i][j]++;
             cap[j][i]++;
         }
@@ -116,7 +117,8 @@ public final class Connectivity {
                 boolean[] side = f.sourceSide(0);
                 bestCut = new ArrayList<Edge>();
                 for (Edge e : es) {
-                    int i = idx.get(e.vertex1), j = idx.get(e.vertex2);
+                    Integer i = idx.get(e.vertex1), j = idx.get(e.vertex2);
+                    if (i == null || j == null) continue;
                     if (side[i] != side[j]) bestCut.add(e);
                 }
             }
@@ -134,8 +136,9 @@ public final class Connectivity {
         Map<Vertex, Integer> idx = GraphMatrices.index(vs);
         boolean[][] adj = new boolean[n][n];
         for (Edge e : es) {
-            int i = idx.get(e.vertex1), j = idx.get(e.vertex2);
-            if (i != j) adj[i][j] = adj[j][i] = true;
+            Integer i = idx.get(e.vertex1), j = idx.get(e.vertex2);
+            if (i == null || j == null) continue;
+            if (!i.equals(j)) adj[i][j] = adj[j][i] = true;
         }
         int inf = n + 1;
         int best = n - 1;
@@ -151,7 +154,7 @@ public final class Connectivity {
                 }
                 Flow f = new Flow(cap);
                 int flow = f.maxFlow(2 * s + 1, 2 * t);
-                if (flow < best || (flow == best && bestCut.isEmpty())) {
+                if (flow < best) {
                     best = flow;
                     boolean[] side = f.sourceSide(2 * s + 1);
                     bestCut = new ArrayList<Vertex>();

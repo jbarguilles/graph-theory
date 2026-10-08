@@ -71,7 +71,48 @@ public class ConnectivityTest {
                 es(und(a, b), und(b, c), und(c, d), und(d, a)));
         assertEquals(2, cut.size);
         assertEquals(2, cut.members.size());
-        assertFalse(cut.members.contains(a) && cut.members.contains(b));   // not adjacent
+        assertTrue(cut.members.equals(Arrays.asList(a, c)) || cut.members.equals(Arrays.asList(b, d)));
+    }
+
+    @Test
+    public void vertexCut_k2_isOne_withNoCut() {
+        Connectivity.Cut<Vertex> cut = Connectivity.minimumVertexCut(vs(a, b), es(und(a, b)));
+        assertEquals(1, cut.size);
+        assertTrue(cut.members.isEmpty());
+    }
+
+    @Test
+    public void stronglyConnected_emptyGraph_isFalse() {
+        assertFalse(Connectivity.isStronglyConnected(vs(), es()));
+    }
+
+    @Test
+    public void singleVertex_hasZeroCuts() {
+        assertEquals(0, Connectivity.minimumVertexCut(vs(a), es()).size);
+        assertEquals(0, Connectivity.minimumEdgeCut(vs(a), es()).size);
+    }
+
+    @Test
+    public void edgeCut_cycleOfFour_isTwoEdgesThatDisconnect() {
+        List<Edge> edges = es(und(a, b), und(b, c), und(c, d), und(d, a));
+        Connectivity.Cut<Edge> cut = Connectivity.minimumEdgeCut(vs(a, b, c, d), edges);
+        assertEquals(2, cut.size);
+        assertEquals(2, cut.members.size());
+        List<Edge> rest = new Vector<Edge>(edges);
+        rest.removeAll(cut.members);
+        assertFalse(Connectivity.isConnected(vs(a, b, c, d), rest));
+    }
+
+    @Test
+    public void onlySelfLoops_isNotConnected() {
+        assertFalse(Connectivity.isConnected(vs(a, b), es(und(a, a), und(b, b))));
+    }
+
+    @Test
+    public void cuts_skipEdgesOutsideTheVertexList() {
+        Edge stray = und(a, d);
+        assertEquals(1, Connectivity.minimumEdgeCut(vs(a, b), es(und(a, b), stray)).size);
+        assertEquals(1, Connectivity.minimumVertexCut(vs(a, b), es(und(a, b), stray)).size);
     }
 
     @Test
