@@ -122,5 +122,5 @@ They follow the walk rules exactly, including direction, so there is no minimum 
 - **Graph window**: clicking a vertex shows its node properties in a fixed info box (degree, in-degree, out-degree, isolated, cutpoint, root).
 - **Properties tab**: shows a table of node properties for all vertices, plus the adjacency matrix and distance matrix. It sits beside the **Graph** tab and is recomputed whenever it is opened.
 - **Color coding on canvas**: root = green ring, cutpoint = orange ring, isolated = grey ring. A vertex is never both a cutpoint and isolated, but a root can be either, so it shows both rings at once (root outermost).
-- **One meaning per colour**: blue = selection (lighter on hover), red = about to be removed, purple = bridge, teal = built walk, amber = selected pair's path. Analysis results are highlighted, never shown by selecting things.
+- **One meaning per colour**: blue = selection (lighter on hover), red = about to be removed, purple = bridge, teal = built walk, amber = selected pair's path, magenta dashed = minimum vertex/edge cut (Properties picture only), grey dashed = an edge being dragged out. Analysis results are highlighted, never shown by selecting things.
 - **Parallel edges and self-loops on canvas**: every edge is drawn separately, so parallel edges and repeated self-loops are each visible and clickable on their own.

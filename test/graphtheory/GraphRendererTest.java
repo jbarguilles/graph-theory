@@ -186,4 +186,19 @@ public class GraphRendererTest {
         assertEquals(GraphRenderer.GRID, pixel(img, GraphRenderer.GRID_STEP, GraphRenderer.GRID_STEP));
         assertEquals(Color.WHITE, pixel(img, GraphRenderer.GRID_STEP + 10, GraphRenderer.GRID_STEP + 10));
     }
+
+    @Test
+    public void analysisOff_hidesRingsBridgesAndHighlights() {
+        Vertex v = new Vertex("v", 100, 100);
+        v.isRoot = true;
+        Edge e = new Edge(v, new Vertex("w", 150, 100), false);
+        e.isBridge = true;
+        e.highlight = Color.CYAN;
+        GraphRenderer.Options o = new GraphRenderer.Options();
+        o.analysis = false;
+        assertEquals(GraphRenderer.EDGE, GraphRenderer.edgeColor(e, o));
+        BufferedImage img = blank();
+        paint(img, Arrays.asList(v), Collections.<Edge>emptyList(), o);
+        assertEquals(Color.WHITE, pixel(img, 100 + Vertex.RADIUS + 7, 100));
+    }
 }

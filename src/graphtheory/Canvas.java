@@ -143,7 +143,7 @@ public class Canvas {
         buildMenuBar();
         frame.pack();
         frame.setLocationRelativeTo(null);
-        setVisible(true);        // creates the canvas image, so it must come before refresh()
+        setVisible(true);
         selectTool(Tools.VERTEX);
         updateTitle();
     }
@@ -831,7 +831,9 @@ public class Canvas {
                 g2.fillRect(0, 0, getWidth(), getHeight());
                 if (sV.isEmpty()) return;
                 g2.transform(GraphRenderer.fit(sV, getWidth(), getHeight(), 50));
-                GraphRenderer.paint(g2, sV, sE, new GraphRenderer.Options());
+                GraphRenderer.Options o = new GraphRenderer.Options();
+                o.analysis = false;
+                GraphRenderer.paint(g2, sV, sE, o);
             }
         };
 
@@ -1458,7 +1460,8 @@ public class Canvas {
     private void drawWalkInfoBox(Graphics g) {
         if (currentWalk == null && walkMessage == null) return;
 
-        int x = 10, y = canvasHeight() - 180, w = 360, h = 95;
+        // Near the bottom, but never up over the vertex info box (y 10 to 168) in a short window.
+        int x = 10, y = Math.max(180, canvasHeight() - 180), w = 360, h = 95;
         g.setColor(new Color(235, 250, 250));
         g.fillRect(x, y, w, h);
         g.setColor(Color.BLACK);

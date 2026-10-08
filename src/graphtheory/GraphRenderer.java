@@ -49,6 +49,11 @@ public final class GraphRenderer {
     public static class Options {
         /** Show selection, hover and remove-hover (the Graph canvas only). */
         public boolean interaction;
+        /**
+         * Show the graph's analysis: root/cutpoint/isolated rings, bridges, walk and path
+         * highlights. Off for a subgraph, whose vertices and edges carry the whole graph's analysis.
+         */
+        public boolean analysis = true;
         /** Minimum vertex cut, drawn as dashed rings. */
         public Set<Vertex> cutVertices = Collections.emptySet();
         /** Minimum edge cut, drawn as dashed edges. */
@@ -68,7 +73,7 @@ public final class GraphRenderer {
             EdgeShapes shapes = EdgeShapes.of(edges);
             boolean weighted = Edge.isWeighted(edges);
             for (Edge e : edges) drawEdge(g, shapes, e, o);
-            for (Edge e : edges) drawEdgeLabel(g, shapes, e, weighted);
+            for (Edge e : edges) drawEdgeLabel(g, shapes, e, weighted, o);
             for (Vertex v : vertices) drawVertex(g, v, o);
             // After the vertices, so rings and the selection glow never paint over an arrowhead.
             for (Edge e : edges) if (e.directed) drawArrowhead(g, shapes, e, o);
@@ -117,8 +122,8 @@ public final class GraphRenderer {
         if (o.interaction && e.wasClicked)  return SELECT;
         if (o.interaction && e.wasFocused)  return HOVER;
         if (o.cutEdges.contains(e))         return CUT;
-        if (e.highlight != null)            return e.highlight;
-        if (e.isBridge)                     return BRIDGE;
+        if (o.analysis && e.highlight != null) return e.highlight;
+        if (o.analysis && e.isBridge)          return BRIDGE;
         return EDGE;
     }
 
@@ -158,9 +163,9 @@ public final class GraphRenderer {
     }
 
     /** Weight (on a weighted graph) and walk step numbers, in one box on the edge's midpoint. */
-    private static void drawEdgeLabel(Graphics2D g, EdgeShapes shapes, Edge e, boolean weighted) {
+    private static void drawEdgeLabel(Graphics2D g, EdgeShapes shapes, Edge e, boolean weighted, Options o) {
         String weight = weighted ? String.valueOf(e.weight) : "";
-        String step = e.stepLabel == null ? "" : e.stepLabel;
+        String step = e.stepLabel == null || !o.analysis ? "" : e.stepLabel;
         if (weight.isEmpty() && step.isEmpty()) return;
         String first = weight.isEmpty() || step.isEmpty() ? weight : weight + " ";
 
@@ -219,7 +224,7 @@ public final class GraphRenderer {
 
         if (o.interaction && v.removeHover) {
             ring(g, x, y, r + 6, REMOVE, new BasicStroke(3f));
-        } else {
+        } else if (o.analysis) {
             if (v.isCutpoint)       ring(g, x, y, r + 4, CUTPOINT, new BasicStroke(2f));
             else if (v.isIsolated()) ring(g, x, y, r + 4, ISOLATED, new BasicStroke(2f));
             if (v.isRoot)           ring(g, x, y, r + 8, ROOT, new BasicStroke(2f));
