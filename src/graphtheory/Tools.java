@@ -79,8 +79,8 @@ public final class Tools {
             case WEIGHT: return "Click an edge to set its weight.";
             case ROOT:   return "Click a vertex to make it (or stop it being) the root of its component.";
             case REMOVE: return "Click a vertex or edge to remove it.";
-            case PAIR:   return "Click two vertices to inspect the ordered pair. Up/Down browse its paths.";
-            case WALK:   return "Click a vertex to start, then vertices or edges to extend. Backspace or right-click undoes a step, Esc clears.";
+            case PAIR:   return "Click two vertices to inspect the ordered pair. Up/Down or the list on the right browse its paths. Esc clears the pair.";
+            case WALK:   return "Click a vertex to start, then vertices or edges to extend. Backspace or right-click undoes a step, Esc clears. A found walk is read-only: click a vertex to start a new one.";
             default:     return "Pick a tool on the left.";
         }
     }

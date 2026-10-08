@@ -92,6 +92,12 @@ Edge cases:
 
 _Avoid_: "distance" for the length of a particular walk — use **Length**.
 
+**Weight of a walk** — the sum of the weights of its edges, counting repeats. Not the same as its length unless every weight is 1.
+
+**Weighted distance** — from u to v, the smallest weight of a walk from u to v. A u–v path of that weight is a **lightest path**. In an unweighted graph the weighted distance equals the distance, and every geodesic is a lightest path; in a weighted graph they can differ.
+
+_Avoid_: "distance" or "geodesic" when the weight sum is meant — use **Weighted distance** and **Lightest path**.
+
 _Avoid_: "Tour" for a closed trail — use **Circuit**. "Tour" is reserved for an **Euler tour**.
 
 ### Euler Trail and Euler Tour
@@ -119,8 +125,9 @@ They follow the walk rules exactly, including direction, so there is no minimum 
 
 ## Display Conventions
 
-- **Graph window**: clicking a vertex shows its node properties in a fixed info box (degree, in-degree, out-degree, isolated, cutpoint, root).
+- **Graph window**: a side panel beside the canvas describes, in this order, whatever currently exists: the selected vertices (their node properties), the selected pair (adjacency, reachability, distance, its paths), and the walk. Nothing is drawn over the graph.
+- **Built and found walks**: a walk is either built click by click, or found by an Euler or Hamiltonian search. A found walk is read-only: clicking starts a new built walk in its place, and adding or removing a vertex or edge, or changing a weight, clears it (moving or renaming a vertex does not).
 - **Properties tab**: shows a table of node properties for all vertices, plus the adjacency matrix and distance matrix. It sits beside the **Graph** tab and is recomputed whenever it is opened.
 - **Color coding on canvas**: root = green ring, cutpoint = orange ring, isolated = grey ring. A vertex is never both a cutpoint and isolated, but a root can be either, so it shows both rings at once (root outermost).
-- **One meaning per colour**: blue = selection (lighter on hover), red = about to be removed, purple = bridge, teal = built walk, amber = selected pair's path, magenta dashed = minimum vertex/edge cut (Properties picture only), grey dashed = an edge being dragged out. Analysis results are highlighted, never shown by selecting things.
+- **One meaning per colour**: blue = selection (lighter on hover), red = about to be removed, purple = bridge, teal = the walk (one being built, or a found Euler trail/tour or Hamiltonian path/cycle), amber = selected pair's path, magenta dashed = minimum vertex/edge cut (Properties picture only), grey dashed = an edge being dragged out. Analysis results are highlighted, never shown by selecting things.
 - **Parallel edges and self-loops on canvas**: every edge is drawn separately, so parallel edges and repeated self-loops are each visible and clickable on their own.
