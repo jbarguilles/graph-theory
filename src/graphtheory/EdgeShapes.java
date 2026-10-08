@@ -1,5 +1,6 @@
 package graphtheory;
 
+import java.awt.geom.Line2D;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
@@ -131,11 +132,14 @@ public final class EdgeShapes {
             double[] l = loop(e);
             return Math.abs(Math.hypot(x - l[0], y - l[1]) - l[2]);
         }
+        // Distance to the polyline through the samples, not just the samples, so long edges have no dead spots.
         double[] c = curve(e);
         double best = Double.MAX_VALUE;
-        for (int i = 0; i <= SAMPLES; i++) {
+        double[] prev = at(c, 0);
+        for (int i = 1; i <= SAMPLES; i++) {
             double[] p = at(c, i / (double) SAMPLES);
-            best = Math.min(best, Math.hypot(x - p[0], y - p[1]));
+            best = Math.min(best, Line2D.ptSegDist(prev[0], prev[1], p[0], p[1], x, y));
+            prev = p;
         }
         return best;
     }

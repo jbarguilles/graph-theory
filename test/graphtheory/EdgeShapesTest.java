@@ -175,4 +175,13 @@ public class EdgeShapesTest {
         assertEquals(0, s.curve(ab)[3], EPS);
         assertEquals(EdgeShapes.LOOP_RADIUS, s.loop(loop)[2], EPS);
     }
+
+    @Test
+    public void nearest_longEdge_hitBetweenSamples() {
+        Vertex far = new Vertex("z", 1000, 0);
+        Edge e = new Edge(a, far, false);
+        // Samples along a 1000px edge are ~30px apart; a click on the line between two must still hit.
+        assertSame(e, shapes(e).nearest(33, 0));
+        assertSame(e, shapes(e).nearest(33, 5));
+    }
 }
