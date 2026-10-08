@@ -29,7 +29,7 @@ public class OverviewView extends JPanel {
 
     final JEditorPane summary = new JEditorPane("text/html", "");
     final JComboBox<String> side = new JComboBox<String>();
-    final JButton editPreferences = new JButton("Edit preferences\u2026");
+    final JButton editPreferences = new JButton("Edit preference lists\u2026");
     private final Thumbnail thumbnail = new Thumbnail();
     private List<List<Vertex>> sides;
     private boolean updating;
@@ -94,6 +94,7 @@ public class OverviewView extends JPanel {
         }
         side.setToolTipText(side.getSelectedIndex() < 0 ? null : side.getItemAt(side.getSelectedIndex()));
         side.setEnabled(usable);
+        if (!usable) side.setToolTipText(sides == null ? "Not bipartite" : "Needs vertices on both sides");
         editPreferences.setEnabled(!r.vertices.isEmpty());
         updating = false;
     }

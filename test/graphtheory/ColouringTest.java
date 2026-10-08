@@ -33,6 +33,13 @@ public class ColouringTest {
     }
 
     @Test
+    public void edgesWithAnEndpointOutsideTheVertices_areSkipped() {
+        Vertex outsider = new Vertex("z", 0, 0);
+        assertEquals(1, Colouring.chromaticNumber(vs(a, b), es(und(a, outsider), und(outsider, outsider))));
+        assertEquals(2, Colouring.chromaticNumber(vs(a, b), es(und(a, b), und(b, outsider))));
+    }
+
+    @Test
     public void selfLoop_hasNoProperColouring() {
         assertEquals(Colouring.NO_PROPER_COLOURING, Colouring.chromaticNumber(vs(a, b), es(und(a, b), arc(b, b))));
     }

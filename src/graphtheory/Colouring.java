@@ -17,13 +17,18 @@ public final class Colouring {
     public static int chromaticNumber(List<Vertex> vs, List<Edge> es) {
         int n = vs.size();
         if (n == 0) return 0;
-        for (Edge e : es) if (e.vertex1 == e.vertex2) return NO_PROPER_COLOURING;
+        Map<Vertex, Integer> idx = GraphMatrices.index(vs);
+        for (Edge e : es) {
+            Integer i = idx.get(e.vertex1), j = idx.get(e.vertex2);
+            if (i == null || j == null) continue;
+            if (i.equals(j)) return NO_PROPER_COLOURING;
+        }
         if (n > CAP) return TOO_LARGE;
         if (es.isEmpty()) return 1;
-        Map<Vertex, Integer> idx = GraphMatrices.index(vs);
         boolean[][] adj = new boolean[n][n];
         for (Edge e : es) {
-            int i = idx.get(e.vertex1), j = idx.get(e.vertex2);
+            Integer i = idx.get(e.vertex1), j = idx.get(e.vertex2);
+            if (i == null || j == null) continue;
             adj[i][j] = adj[j][i] = true;
         }
         int[] colour = new int[n];

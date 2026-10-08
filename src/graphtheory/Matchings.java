@@ -86,7 +86,7 @@ public final class Matchings {
     }
 
     /**
-     * The stable matching found by Gale–Shapley with the side containing 'proposer' proposing
+     * The stable matching found by Gale--Shapley with the side containing 'proposer' proposing
      * (side A if proposer is null or not in the graph). null when the graph is not bipartite or
      * some vertex with a neighbour has no preference list.
      * Assumes preference lists are in step with the edges (PreferenceLists.sync).

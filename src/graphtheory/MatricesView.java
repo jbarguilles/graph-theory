@@ -30,6 +30,7 @@ public class MatricesView extends JPanel {
 
     public MatricesView() {
         super(new BorderLayout());
+        kind.setPrototypeDisplayValue(WEIGHTED);
         JPanel top = new JPanel(new BorderLayout(8, 4));
         top.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
         top.add(kind, BorderLayout.WEST);

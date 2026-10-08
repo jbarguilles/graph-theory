@@ -17,7 +17,7 @@ public final class Connectivity {
 
     private Connectivity() {}
 
-    /** A minimum cut: its size (κ or λ) and its members. Members are empty when no cut exists. */
+    /** A minimum cut: its size (kappa or lambda) and its members. Members are empty when no cut exists. */
     public static final class Cut<T> {
         public final int size;
         public final List<T> members;
@@ -95,7 +95,7 @@ public final class Connectivity {
         return true;
     }
 
-    /** λ(G) and a minimum edge cut. 0 and empty for a disconnected graph or fewer than two vertices. */
+    /** lambda(G) and a minimum edge cut. 0 and empty for a disconnected graph or fewer than two vertices. */
     public static Cut<Edge> minimumEdgeCut(List<Vertex> vs, List<Edge> es) {
         int n = vs.size();
         if (n < 2 || !isConnected(vs, es)) return new Cut<Edge>(0, new ArrayList<Edge>());
@@ -127,8 +127,8 @@ public final class Connectivity {
     }
 
     /**
-     * κ(G) and a minimum vertex cut. 0 and empty when disconnected or fewer than two vertices;
-     * n − 1 and empty when every two vertices are adjacent (no vertex set disconnects the graph).
+     * kappa(G) and a minimum vertex cut. 0 and empty when disconnected or fewer than two vertices;
+     * n - 1 and empty when every two vertices are adjacent (no vertex set disconnects the graph).
      */
     public static Cut<Vertex> minimumVertexCut(List<Vertex> vs, List<Edge> es) {
         int n = vs.size();
@@ -167,7 +167,7 @@ public final class Connectivity {
         return new Cut<Vertex>(best, bestCut);
     }
 
-    /** Edmonds–Karp on a small capacity matrix. */
+    /** Edmonds--Karp on a small capacity matrix. */
     private static final class Flow {
         private final int[][] residual;
 
