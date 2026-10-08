@@ -5,12 +5,14 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Rectangle;
+import java.awt.event.MouseEvent;
 import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
+import javax.swing.AbstractListModel;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
-import javax.swing.DefaultListModel;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
@@ -27,7 +29,8 @@ import javax.swing.table.DefaultTableModel;
  * The Graph tab's right-hand panel (CONTEXT.md, Display Conventions): Selection, Pair
  * and Walk sections in that order, each shown only when it has something to say.
  * A section is only rebuilt when its text changes, so display() is cheap enough to
- * call on every refresh.
+ * call on every refresh. Path rows are built only when the list paints them, so the
+ * cost of display() does not grow with the number of paths.
  */
 public class SidePanel extends JPanel implements Scrollable {
 
@@ -56,10 +59,15 @@ public class SidePanel extends JPanel implements Scrollable {
 
     private final Listener listener;
     private boolean updating;
-    private String selectionKey, pairKey, walkKey;
+    private String selectionKey, walkKey;
+    /** What the Pair section shows now: the summary object, its facts and row names, the highlighted row. */
+    private PairSummary shownPair;
+    private List<Vertex> rowVertices = Collections.emptyList();
+    private String shownPairText;
+    private int shownPathIndex = -1;
 
     // Package-private for SidePanelTest.
-    final JLabel hint = new JLabel("<html>Select a vertex, pick a pair, or build a walk.</html>");
+    final JTextArea hint = textArea();
     final JPanel selection = section("Selection");
     final JTable selectionTable = new JTable() {
         @Override
@@ -69,19 +77,28 @@ public class SidePanel extends JPanel implements Scrollable {
     };
     final JPanel pair = section("Pair");
     final JTextArea pairFacts = textArea();
-    final DefaultListModel<String> pathModel = new DefaultListModel<String>();
-    final JList<String> pathList = new JList<String>(pathModel);
+    PathRows pathRows = new PathRows(null);
+    final JList<String> pathList = new JList<String>(pathRows) {
+        /** The whole row, so a long walk can be read without scrolling sideways. */
+        @Override
+        public String getToolTipText(MouseEvent e) {
+            int i = locationToIndex(e.getPoint());
+            if (i < 0 || !getCellBounds(i, i).contains(e.getPoint())) return null;
+            return getModel().getElementAt(i);
+        }
+    };
     final JPanel walk = section("Walk");
     final JLabel walkHeading = new JLabel();
     final JTextArea walkText = textArea();
     final JTextArea walkFacts = textArea();
-    final JLabel walkMessage = new JLabel();
+    final JTextArea walkMessage = textArea();
 
     public SidePanel(Listener listener) {
         this.listener = listener;
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
         setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
 
+        hint.setText("Select a vertex, pick a pair, or build a walk.");
         hint.setForeground(Color.GRAY);
         add(left(hint));
 
@@ -94,6 +111,8 @@ public class SidePanel extends JPanel implements Scrollable {
         pair.add(left(pairFacts));
         pathList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         pathList.setVisibleRowCount(8);
+        // Fixed cell sizes: JList would otherwise measure every row to lay out the list.
+        pathList.setPrototypeCellValue("1. len 1");
         pathList.addListSelectionListener(new ListSelectionListener() {
             public void valueChanged(ListSelectionEvent e) {
                 if (!updating && !e.getValueIsAdjusting() && pathList.getSelectedIndex() >= 0) {
@@ -152,35 +171,83 @@ public class SidePanel extends JPanel implements Scrollable {
     }
 
     private boolean showPair(Content c) {
+        boolean newPair = c.pair != shownPair;
+        if (newPair) rowVertices = verticesOnPaths(c.pair);
         String facts = c.pair == null ? "" : PanelText.join(java.util.Arrays.asList(PanelText.pairFacts(c.pair)), "\n");
-        StringBuilder rows = new StringBuilder();
-        if (c.pair != null) {
-            for (int i = 0; i < c.pair.paths.size(); i++) {
-                rows.append(PanelText.pathRow(i, c.pair.paths.get(i), c.pair)).append('\n');
-            }
-        }
-        String key = facts + '\u0000' + rows + '\u0000' + c.pathIndex;
-        if (key.equals(pairKey)) return false;
-        String oldRows = pairKey == null ? null : pairKey.substring(pairKey.indexOf('\u0000') + 1, pairKey.lastIndexOf('\u0000'));
-        pairKey = key;
+        // Rows name the vertices on the paths, so a rename must re-render them.
+        StringBuilder text = new StringBuilder(facts);
+        for (Vertex v : rowVertices) text.append('\n').append(v.name);
+        boolean textChanged = !text.toString().equals(shownPairText);
+        if (!newPair && !textChanged && c.pathIndex == shownPathIndex) return false;
+        shownPair = c.pair;
+        shownPairText = text.toString();
+        shownPathIndex = c.pathIndex;
 
         pair.setVisible(c.pair != null);
         pairFacts.setText(facts);
-        if (!rows.toString().equals(oldRows)) {
-            pathModel.clear();
-            if (c.pair != null) {
-                for (int i = 0; i < c.pair.paths.size(); i++) {
-                    pathModel.addElement(PanelText.pathRow(i, c.pair.paths.get(i), c.pair));
-                }
-            }
+        if (newPair) {
+            pathRows = new PathRows(c.pair);
+            pathList.setPrototypeCellValue(widestRowGuess(c.pair));
+            pathList.setModel(pathRows);
+        } else if (textChanged) {
+            pathRows.rowsChanged();
         }
-        if (c.pathIndex >= 0 && c.pathIndex < pathModel.getSize()) {
+        if (c.pathIndex >= 0 && c.pathIndex < pathRows.getSize()) {
             pathList.setSelectedIndex(c.pathIndex);
             pathList.ensureIndexIsVisible(c.pathIndex);
         } else {
             pathList.clearSelection();
         }
         return true;
+    }
+
+    /** Each vertex on some path of s, once. */
+    private static List<Vertex> verticesOnPaths(PairSummary s) {
+        if (s == null) return Collections.emptyList();
+        IdentityHashMap<Vertex, Boolean> seen = new IdentityHashMap<Vertex, Boolean>();
+        List<Vertex> vs = new java.util.ArrayList<Vertex>();
+        for (Vertex v : java.util.Arrays.asList(s.from, s.to)) {
+            if (seen.put(v, Boolean.TRUE) == null) vs.add(v);
+        }
+        for (Walk p : s.paths) {
+            for (Vertex v : p.vertices()) {
+                if (seen.put(v, Boolean.TRUE) == null) vs.add(v);
+            }
+        }
+        return vs;
+    }
+
+    /** The row of the path with the most edges, sizing every cell so JList need not measure each row. */
+    private static String widestRowGuess(PairSummary s) {
+        if (s == null || s.paths.isEmpty()) return "1. len 1";
+        int widest = 0;
+        for (int i = 1; i < s.paths.size(); i++) {
+            if (s.paths.get(i).length() > s.paths.get(widest).length()) widest = i;
+        }
+        // The last row number is the longest one.
+        return PanelText.pathRow(s.paths.size() - 1, s.paths.get(widest), s);
+    }
+
+    /** The path list's rows, each built from the summary when the list asks for it. */
+    static final class PathRows extends AbstractListModel<String> {
+        private final PairSummary summary;
+
+        PathRows(PairSummary summary) {
+            this.summary = summary;
+        }
+
+        public int getSize() {
+            return summary == null ? 0 : summary.paths.size();
+        }
+
+        public String getElementAt(int i) {
+            return PanelText.pathRow(i, summary.paths.get(i), summary);
+        }
+
+        /** Same paths, new wording (e.g. a vertex was renamed): every row re-renders. */
+        void rowsChanged() {
+            if (getSize() > 0) fireContentsChanged(this, 0, getSize() - 1);
+        }
     }
 
     private boolean showWalk(Content c) {
@@ -200,12 +267,8 @@ public class SidePanel extends JPanel implements Scrollable {
             walkFacts.setText(PanelText.join(java.util.Arrays.asList(PanelText.walkFacts(c.walk, c.weighted)), "\n"));
         }
         walkMessage.setVisible(c.walkMessage != null);
-        walkMessage.setText(c.walkMessage == null ? "" : "<html>" + escape(c.walkMessage) + "</html>");
+        walkMessage.setText(c.walkMessage == null ? "" : c.walkMessage);
         return true;
-    }
-
-    private static String escape(String s) {
-        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 
     private static JPanel section(String title) {

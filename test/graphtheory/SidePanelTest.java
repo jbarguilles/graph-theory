@@ -2,6 +2,9 @@ package graphtheory;
 
 import java.util.Arrays;
 import java.util.Vector;
+import javax.swing.ListModel;
+import javax.swing.event.ListDataEvent;
+import javax.swing.event.ListDataListener;
 import org.junit.Test;
 import static org.junit.Assert.*;
 
@@ -104,5 +107,81 @@ public class SidePanelTest {
         p.display(c);
         assertTrue(p.walk.isVisible());
         assertFalse(p.walkText.isVisible());
+    }
+
+    @Test
+    public void walkMessage_isWrappingText() {
+        SidePanel p = panel();
+        SidePanel.Content c = new SidePanel.Content();
+        c.walkMessage = "No edge from v to u <here> & there";
+        p.display(c);
+        assertTrue(p.walkMessage.getLineWrap());
+        assertEquals("No edge from v to u <here> & there", p.walkMessage.getText());
+        assertTrue(p.hint.getLineWrap());
+    }
+
+    /** Counts list events so a test can tell whether display() touched the rows. */
+    private static class Events implements ListDataListener {
+        int count;
+        public void intervalAdded(ListDataEvent e) { count++; }
+        public void intervalRemoved(ListDataEvent e) { count++; }
+        public void contentsChanged(ListDataEvent e) { count++; }
+    }
+
+    @Test
+    public void unchangedContent_keepsTheRowsAndTheUsersSelection() {
+        SidePanel p = panel();
+        SidePanel.Content c = new SidePanel.Content();
+        c.pair = pairWithTwoPaths();
+        c.pathIndex = 0;
+        p.display(c);
+        ListModel<String> model = p.pathList.getModel();
+        Events events = new Events();
+        model.addListDataListener(events);
+        p.pathList.setSelectedIndex(1);
+        p.display(c);
+        assertSame(model, p.pathList.getModel());
+        assertEquals(0, events.count);
+        assertEquals(1, p.pathList.getSelectedIndex());
+    }
+
+    @Test
+    public void newSummary_replacesTheRows() {
+        SidePanel p = panel();
+        SidePanel.Content c = new SidePanel.Content();
+        c.pair = pairWithTwoPaths();
+        p.display(c);
+        SidePanel.Content d = new SidePanel.Content();
+        d.pair = new PairSummary(u, v, new Vector<Edge>(Arrays.asList(new Edge(u, v, false))));
+        p.display(d);
+        assertEquals(1, p.pathList.getModel().getSize());
+        assertEquals(PanelText.pathRow(0, d.pair.paths.get(0), d.pair), p.pathList.getModel().getElementAt(0));
+    }
+
+    @Test
+    public void renameUnderTheSameSummary_rowsReRender() {
+        SidePanel p = panel();
+        SidePanel.Content c = new SidePanel.Content();
+        c.pair = pairWithTwoPaths();
+        p.display(c);
+        Events events = new Events();
+        p.pathList.getModel().addListDataListener(events);
+        u.name = "w";
+        p.display(c);
+        assertTrue(events.count > 0);
+        assertTrue(p.pathList.getModel().getElementAt(0).contains("w -{"));
+    }
+
+    @Test
+    public void pathRowTooltip_isTheWholeRow() {
+        SidePanel p = panel();
+        SidePanel.Content c = new SidePanel.Content();
+        c.pair = pairWithTwoPaths();
+        p.display(c);
+        p.pathList.setSize(200, 200);
+        java.awt.Rectangle r = p.pathList.getCellBounds(1, 1);
+        java.awt.event.MouseEvent e = new java.awt.event.MouseEvent(p.pathList, java.awt.event.MouseEvent.MOUSE_MOVED,
+                0, 0, r.x + 1, r.y + 1, 0, false);
+        assertEquals(p.pathList.getModel().getElementAt(1), p.pathList.getToolTipText(e));
     }
 }

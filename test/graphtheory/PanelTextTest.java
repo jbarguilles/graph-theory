@@ -62,16 +62,30 @@ public class PanelTextTest {
     public void pathRow_weighted_showsWeightAndTags() {
         PairSummary s = new PairSummary(u, v, new Vector<Edge>(Arrays.asList(
                 und(u, v, 10), und(u, m, 1), und(m, v, 1))));
-        assertEquals("1. u -{u,m}-> m -{m,v}-> v   len 2 \u00b7 weight 2   lightest",
+        assertEquals("1. len 2 \u00b7 weight 2 \u00b7 lightest   u -{u,m}-> m -{m,v}-> v",
                 PanelText.pathRow(0, s.paths.get(0), s));
-        assertEquals("2. u -{u,v}-> v   len 1 \u00b7 weight 10   geodesic",
+        assertEquals("2. len 1 \u00b7 weight 10 \u00b7 geodesic   u -{u,v}-> v",
                 PanelText.pathRow(1, s.paths.get(1), s));
+    }
+
+    @Test
+    public void pathRow_weighted_bothTags() {
+        PairSummary s = new PairSummary(u, v, new Vector<Edge>(Arrays.asList(und(u, v, 3))));
+        assertEquals("1. len 1 \u00b7 weight 3 \u00b7 geodesic, lightest   u -{u,v}-> v",
+                PanelText.pathRow(0, s.paths.get(0), s));
     }
 
     @Test
     public void pathRow_unweighted_noWeightNoLightest() {
         PairSummary s = new PairSummary(u, v, new Vector<Edge>(Arrays.asList(und(u, v, 1))));
-        assertEquals("1. u -{u,v}-> v   len 1   geodesic", PanelText.pathRow(0, s.paths.get(0), s));
+        assertEquals("1. len 1 \u00b7 geodesic   u -{u,v}-> v", PanelText.pathRow(0, s.paths.get(0), s));
+    }
+
+    @Test
+    public void pathRow_noTags_justTheLength() {
+        PairSummary s = new PairSummary(u, v, new Vector<Edge>(Arrays.asList(
+                und(u, v, 1), und(u, m, 1), und(m, v, 1))));
+        assertEquals("2. len 2   u -{u,m}-> m -{m,v}-> v", PanelText.pathRow(1, s.paths.get(1), s));
     }
 
     @Test

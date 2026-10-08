@@ -81,4 +81,39 @@ public class PairSummaryTest {
         assertEquals(2, s.paths.get(1).length());
         assertEquals(s.distance(), s.weightedDistance());
     }
+
+    @Test
+    public void sameVertex_trivialPath_distanceZero_notAdjacentWithoutSelfLoop() {
+        PairSummary s = new PairSummary(u, u, edges(und(u, v, 2)));
+        assertTrue(s.reachable());
+        assertFalse(s.adjacent);
+        assertEquals(1, s.paths.size());
+        assertEquals(0, s.paths.get(0).length());
+        assertEquals(0, s.distance());
+        assertEquals(0, s.weightedDistance());
+        assertTrue(s.isGeodesic(s.paths.get(0)));
+        assertTrue(s.isLightest(s.paths.get(0)));
+    }
+
+    @Test
+    public void sameVertex_withSelfLoop_isAdjacent_distanceStillZero() {
+        PairSummary s = new PairSummary(u, u, edges(und(u, u, 1)));
+        assertTrue(s.adjacent);
+        assertTrue(s.reachable());
+        assertEquals(0, s.distance());
+        assertEquals(0, s.weightedDistance());
+    }
+
+    @Test
+    public void weightZeroEdges_weightedDistanceZeroOnANonTrivialPath() {
+        PairSummary s = new PairSummary(u, v, edges(und(u, v, 1), und(u, m, 0), und(m, v, 0)));
+        assertTrue(s.weighted);
+        assertEquals(1, s.distance());
+        assertEquals(0, s.weightedDistance());
+        Walk lightest = s.paths.get(0);
+        assertEquals(2, lightest.length());
+        assertEquals(0, lightest.weight());
+        assertTrue(s.isLightest(lightest));
+        assertFalse(s.isLightest(s.paths.get(1)));
+    }
 }

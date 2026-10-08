@@ -36,7 +36,7 @@ public final class PairSummary {
         if (weighted) {
             Collections.sort(ps, new Comparator<Walk>() {
                 public int compare(Walk p, Walk q) {
-                    return p.weight() - q.weight();
+                    return Integer.compare(p.weight(), q.weight());
                 }
             });
         }

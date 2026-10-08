@@ -54,15 +54,19 @@ public final class PanelText {
         return lines.toArray(new String[0]);
     }
 
-    /** One row of the path list, e.g. "1. u -{u,v}-> v   len 1 · weight 3   geodesic, lightest". */
+    /**
+     * One row of the path list, numbers first so they stay visible in a narrow panel,
+     * e.g. "1. len 1 \u00b7 weight 3 \u00b7 geodesic, lightest   u -{u,v}-> v".
+     */
     public static String pathRow(int index, Walk p, PairSummary s) {
         StringBuilder sb = new StringBuilder();
-        sb.append(index + 1).append(". ").append(p).append("   len ").append(p.length());
+        sb.append(index + 1).append(". len ").append(p.length());
         if (s.weighted) sb.append(" \u00b7 weight ").append(p.weight());
         List<String> tags = new ArrayList<String>();
         if (s.isGeodesic(p)) tags.add("geodesic");
         if (s.weighted && s.isLightest(p)) tags.add("lightest");
-        if (!tags.isEmpty()) sb.append("   ").append(join(tags, ", "));
+        if (!tags.isEmpty()) sb.append(" \u00b7 ").append(join(tags, ", "));
+        sb.append("   ").append(p);
         return sb.toString();
     }
 
