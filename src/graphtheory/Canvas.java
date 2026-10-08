@@ -489,12 +489,10 @@ public class Canvas {
     /** Recomputes what the Properties tab shows. */
     private void computeProperties() {
         if (vertexList.size() > 0) {
-            int[][] matrix = gP.generateAdjacencyMatrix(vertexList, edgeList);
+            gP.generateAdjacencyMatrix(vertexList, edgeList);
 
             gP.vertexConnectivity(vertexList);
             gP.edgeConnectivity(vertexList, edgeList);
-
-            reloadVertexConnections(matrix, vertexList);
 
             gP.generateDistanceMatrix(vertexList);
             gP.displayContainers(vertexList);
@@ -1304,20 +1302,6 @@ public class Canvas {
 
     private void arrangeVertices() {
         Layout.arrangeOnCircle(vertexList, canvasWidth(), canvasHeight());
-    }
-
-    private void reloadVertexConnections(int[][] aMatrix, Vector<Vertex> vList) {
-        for (Vertex v : vList) {
-            v.undirectedNeighbors.clear();
-        }
-
-        for (int i = 0; i < aMatrix.length; i++) {
-            for (int j = 0; j < aMatrix.length; j++) {
-                if (aMatrix[i][j] == 1) {
-                    vList.get(i).addUndirectedNeighbor(vList.get(j));
-                }
-            }
-        }
     }
 
     public void refresh() {
