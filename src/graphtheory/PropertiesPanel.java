@@ -1,6 +1,8 @@
 package graphtheory;
 
 import java.awt.Dimension;
+import java.util.List;
+import javax.swing.RowSorter;
 import javax.swing.JScrollPane;
 import javax.swing.JTabbedPane;
 import javax.swing.JTable;
@@ -47,16 +49,20 @@ public class PropertiesPanel extends JTabbedPane {
     public void display(PropertiesReport r) {
         if (r == shown) return;
         shown = r;
-        overview.show(r);
+        overview.showReport(r);
         Object[][] rows = new Object[r.vertices.size()][];
         for (int i = 0; i < rows.length; i++) rows[i] = PanelText.verticesRow(r.vertices.get(i), r.vertices, r.edges);
+        // A new model gets a new sorter; keep the user's sort (the columns never change).
+        List<? extends RowSorter.SortKey> sortKeys = verticesTable.getRowSorter() == null ? null
+                : verticesTable.getRowSorter().getSortKeys();
         verticesTable.setModel(new DefaultTableModel(rows, PanelText.VERTICES_COLUMNS) {
             @Override public Class<?> getColumnClass(int c) { return c >= 1 && c <= 3 ? Integer.class : String.class; }
             @Override public boolean isCellEditable(int r, int c) { return false; }
         });
+        if (sortKeys != null && verticesTable.getRowSorter() != null) verticesTable.getRowSorter().setSortKeys(sortKeys);
         fitColumns(verticesTable);
-        matrices.show(r);
-        charts.show(r);
+        matrices.showReport(r);
+        charts.showReport(r);
     }
 
     /** Each column's preferred width = its header or its widest cell, so nothing is cut off with "...". */

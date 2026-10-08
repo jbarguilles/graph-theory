@@ -9,10 +9,12 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.ListSelectionModel;
+import javax.swing.SwingConstants;
 import javax.swing.UIManager;
 import javax.swing.table.AbstractTableModel;
+import javax.swing.table.DefaultTableCellRenderer;
 
-/** The Matrices sub-tab: one matrix at a time, names frozen on both edges, ∞ = unreachable. */
+/** The Matrices sub-tab: one matrix at a time, names frozen on both edges, PanelText.INFINITY = unreachable. */
 public class MatricesView extends JPanel {
 
     static final String ADJACENCY = "Adjacency", DISTANCE = "Distance", WEIGHTED = "Weighted distance";
@@ -21,7 +23,8 @@ public class MatricesView extends JPanel {
     final JLabel caption = new JLabel(" ");
     final JTable table = new JTable();
     final JTable rowHeader = new JTable();
-    private final String[][] rowNames = { new String[0] };
+    /** rowNames[0] names the shown matrix's rows; TableCopy reads it on Ctrl+C. */
+    final String[][] rowNames = { new String[0] };
     private PropertiesReport report;
     private boolean updating;
 
@@ -36,6 +39,9 @@ public class MatricesView extends JPanel {
         table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
         table.setCellSelectionEnabled(true);
         table.getTableHeader().setReorderingAllowed(false);
+        DefaultTableCellRenderer centred = new DefaultTableCellRenderer();
+        centred.setHorizontalAlignment(SwingConstants.CENTER);
+        table.setDefaultRenderer(Object.class, centred);
         rowHeader.setFocusable(false);
         rowHeader.setRowSelectionAllowed(false);
         rowHeader.setBackground(UIManager.getColor("TableHeader.background"));
@@ -48,7 +54,7 @@ public class MatricesView extends JPanel {
         kind.addActionListener(e -> { if (!updating) showSelected(); });
     }
 
-    public void show(PropertiesReport r) {
+    public void showReport(PropertiesReport r) {
         report = r;
         updating = true;
         Object was = kind.getSelectedItem();
@@ -66,8 +72,8 @@ public class MatricesView extends JPanel {
         Object k = kind.getSelectedItem();
         final int[][] m = DISTANCE.equals(k) ? report.distances
                 : WEIGHTED.equals(k) ? report.weightedDistances : report.adjacency;
-        caption.setText(DISTANCE.equals(k) ? "Fewest edges on a walk from row to column. ∞ = unreachable."
-                : WEIGHTED.equals(k) ? "Smallest weight of a walk from row to column. ∞ = unreachable."
+        caption.setText(DISTANCE.equals(k) ? "Fewest edges on a walk from row to column. " + PanelText.INFINITY + " = unreachable."
+                : WEIGHTED.equals(k) ? "Smallest weight of a walk from row to column. " + PanelText.INFINITY + " = unreachable."
                 : "Edges from row to column. An undirected self-loop counts 2.");
         final String[] names = new String[report.vertices.size()];
         for (int i = 0; i < names.length; i++) names[i] = report.vertices.get(i).name;

@@ -21,7 +21,7 @@ public class DegreeChartsView extends JComponent {
         setBackground(Color.WHITE);
     }
 
-    public void show(PropertiesReport r) {
+    public void showReport(PropertiesReport r) {
         vs = new Vector<Vertex>(r.vertices);
         es = new Vector<Edge>(r.edges);
         setPreferredSize(new Dimension(X + 60 + PLOT_W + 40, Y + GraphProperties.degreeDistributionsHeight(es)));
