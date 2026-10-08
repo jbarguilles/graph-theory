@@ -271,7 +271,7 @@ public class GraphProperties {
      * vertices with each degree. They share one y-axis scale so they can be compared.
      * Returns the height used (always degreeDistributionsHeight(eList)).
      */
-    public int drawDegreeDistributions(Graphics g0, Vector<Vertex> vList, Vector<Edge> eList,
+    public static int drawDegreeDistributions(Graphics g0, Vector<Vertex> vList, Vector<Edge> eList,
                                        int x, int y, int plotW) {
         java.util.List<DegreeDistribution.Kind> kinds = DegreeDistribution.kindsFor(eList);
         int n = vList.size();
@@ -302,7 +302,7 @@ public class GraphProperties {
         return degreeDistributionsHeight(eList);
     }
 
-    private void drawDistributionChart(java.awt.Graphics2D g, DegreeDistribution.Kind kind, int[] counts,
+    private static void drawDistributionChart(java.awt.Graphics2D g, DegreeDistribution.Kind kind, int[] counts,
                                        int n, int x, int y, int plotW, int ticks, double axisMax) {
         java.awt.FontMetrics fm = g.getFontMetrics();
         int plotX = x + DIST_LEFT_PAD;
@@ -372,6 +372,28 @@ public class GraphProperties {
         } finally {
             r.dispose();
         }
+    }
+
+    /** Tooltip for the charts drawn at (x, y) with plotW: "degree 3: 4 vertices (0.40)", or null off the bars' columns. */
+    public static String distributionTooltip(Vector<Vertex> vList, Vector<Edge> eList, int x, int y, int plotW,
+                                             int mx, int my) {
+        int n = vList.size();
+        if (n == 0 || my < y) return null;
+        java.util.List<DegreeDistribution.Kind> kinds = DegreeDistribution.kindsFor(eList);
+        int perChart = DIST_TOP_PAD + DIST_PLOT_H + DIST_BOTTOM_PAD + DIST_GAP;
+        int i = (my - y) / perChart;
+        if (i >= kinds.size()) return null;
+        int plotY = y + i * perChart + DIST_TOP_PAD;
+        int plotX = x + DIST_LEFT_PAD;
+        if (my < plotY || my > plotY + DIST_PLOT_H || mx < plotX || mx >= plotX + plotW) return null;
+        DegreeDistribution.Kind kind = kinds.get(i);
+        int[] counts = DegreeDistribution.counts(vList, kind);
+        int d = (int) ((mx - plotX) / ((double) plotW / counts.length));
+        if (d < 0 || d >= counts.length) return null;
+        String label = kind == DegreeDistribution.Kind.DEGREE ? "degree"
+                : kind == DegreeDistribution.Kind.IN_DEGREE ? "in-degree" : "out-degree";
+        return label + " " + d + ": " + counts[d] + (counts[d] == 1 ? " vertex" : " vertices")
+                + String.format(" (%.2f)", (double) counts[d] / n);
     }
 
     // ---- Euler / Hamiltonian answers for the summary, cached per graph change ----
