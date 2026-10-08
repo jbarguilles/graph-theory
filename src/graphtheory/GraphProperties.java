@@ -19,9 +19,6 @@ import java.util.Vector;
  */
 public class GraphProperties {
 
-    /** Colors assigned by the last call to greedyColoring(). Index = vertexList index. */
-    public int[] vertexColors = new int[0];
-
     // ---- Degree distributions (CONTEXT.md, Degree distribution) ----
 
     private static final int DIST_PLOT_H = 140;
@@ -170,7 +167,8 @@ public class GraphProperties {
 
     // ---- Graph coloring ----
 
-    public int[] greedyColoring(Vector<Vertex> vList) {
+    /** Colours the vertices greedily, highest degree first, into each vertex's colorId. */
+    public void greedyColoring(Vector<Vertex> vList) {
         int n = vList.size();
         int[] color = new int[n];
         Arrays.fill(color, -1);
@@ -194,14 +192,11 @@ public class GraphProperties {
             color[idx] = c;
         }
 
-        this.vertexColors = color;
         for (int i = 0; i < n; i++) vList.get(i).colorId = color[i];
-        return color;
     }
 
     public void clearColoring(Vector<Vertex> vList) {
         for (Vertex v : vList) v.colorId = -1;
-        this.vertexColors = new int[0];
     }
 
     private List<Vertex> allNeighborsForColoring(Vertex u) {

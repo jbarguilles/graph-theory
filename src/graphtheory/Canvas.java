@@ -499,7 +499,12 @@ public class Canvas {
     /** Rebuilds the Properties report if the graph or the proposing side changed since the last one. */
     private void computeProperties() {
         recomputeGraphProperties();   // cutpoints, read by the Vertices table
-        if (proposer != null && !vertexList.contains(proposer)) proposer = null;
+        // Undo, redo and open rebuild the vertices: keep the side by finding the vertex of the same name.
+        if (proposer != null && !vertexList.contains(proposer)) {
+            String name = proposer.name;
+            proposer = null;
+            for (Vertex v : vertexList) if (v.name.equals(name)) proposer = v;
+        }
         String key = snapshot() + "\u0000" + (proposer == null ? "" : proposer.name);
         if (!key.equals(reportKey)) {
             report = new PropertiesReport(vertexList, edgeList, proposer);
@@ -527,9 +532,10 @@ public class Canvas {
     private void updateStatus() {
         if (statusHint == null) return;
         statusHint.setText(selectedWindow == 0
-                ? Tools.hint(selectedTool) + "  (Ctrl+Shift+C: greedy colouring)"
+                ? Tools.hint(selectedTool)
                 : "Ctrl+C copies the selected cells \u00b7 Ctrl+Shift+C colours the graph greedily \u00b7 switch to the Graph tab to edit.");
-        statusCounts.setText(vertexList.size() + " vertices \u00b7 " + edgeList.size() + " edges");
+        statusCounts.setText((selectedWindow == 0 ? "Ctrl+Shift+C: greedy colouring \u00b7 " : "")
+                + vertexList.size() + " vertices \u00b7 " + edgeList.size() + " edges");
     }
 
     private void showAbout() {
@@ -1234,6 +1240,8 @@ public class Canvas {
         applyHighlights();
         updateSidePanel();
         canvas.repaint();
+        // Colouring changes no graph text, so the report is reused; repaint to show the colours.
+        if (selectedWindow == 1) propertiesPanel.repaint();
         updateStatus();
     }
 
