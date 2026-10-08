@@ -62,7 +62,7 @@ A set of vertices and edges. This project supports **mixed graphs** — graphs c
 
 **Complete graph** — a simple graph in which every two vertices are joined both ways: by an undirected edge, or by both arcs (a, b) and (b, a). A mixed graph can be complete.
 
-**Density** — for a simple graph only: the fraction of ordered pairs of distinct vertices (u, v) such that one edge leads from u to v. An undirected edge counts for both (u, v) and (v, u), so for a graph with only undirected edges this is |E| / (n(n−1)/2). A graph is complete exactly when its density is 1. Undefined for graphs with fewer than two vertices or that are not simple.
+**Density** — for a simple graph only: the fraction of ordered pairs of distinct vertices (u, v) such that one edge leads from u to v. An undirected edge counts for both (u, v) and (v, u), so for a graph with only undirected edges this is |E| / (n(n−1)/2). A graph with at least two vertices is complete exactly when its density is 1. Undefined for graphs with fewer than two vertices or that are not simple.
 
 **Cyclic / Acyclic** — a graph is cyclic if it contains a **Cycle** (see Walk), respecting direction and counting parallel edges and self-loops. So {a, b} twice is cyclic (a cycle of length 2), and so is {a, b} with (b, a); the arcs (a, b), (b, c), (a, c) are acyclic.
 
