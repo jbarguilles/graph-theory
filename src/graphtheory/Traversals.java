@@ -42,6 +42,21 @@ public class Traversals {
         return euler(vList, eList, true);
     }
 
+    /**
+     * True if some closed walk crosses every edge at least once (CONTEXT.md, Tour):
+     * there is an edge, and the vertices with edges are strongly connected.
+     */
+    public static boolean hasTour(List<Vertex> vList, List<Edge> eList) {
+        if (eList.isEmpty()) return false;
+        Set<Vertex> touched = new LinkedHashSet<Vertex>();
+        for (Edge e : eList) {
+            touched.add(e.vertex1);
+            touched.add(e.vertex2);
+        }
+        touched.retainAll(vList);
+        return Connectivity.isStronglyConnected(new Vector<Vertex>(touched), eList);
+    }
+
     private static Walk euler(Vector<Vertex> vList, Vector<Edge> eList, boolean closed) {
         if (vList.isEmpty()) return null;
         // The trivial walk uses all zero edges, but it is not closed.

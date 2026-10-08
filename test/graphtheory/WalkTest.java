@@ -30,6 +30,20 @@ public class WalkTest {
     }
 
     @Test
+    public void tour_closedAndCrossesEveryEdge_repeatsAllowed() {
+        Edge ab = und(a, b), bc = und(b, c);
+        Walk w = new Walk(a);
+        w.extend(ab);
+        w.extend(bc);
+        w.extend(bc);
+        assertFalse(w.isTour(Arrays.asList(ab, bc)));  // not closed yet
+        w.extend(ab);
+        assertTrue(w.isTour(Arrays.asList(ab, bc)));   // repeats every edge: a tour, not a circuit
+        assertFalse(w.isCircuit());
+        assertFalse(w.isTour(Arrays.asList(ab, bc, und(c, d))));
+    }
+
+    @Test
     public void undirectedEdge_traversableBothWays() {
         Edge ab = und(a, b);
         assertTrue(Walk.canTraverse(ab, a));

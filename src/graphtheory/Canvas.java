@@ -1287,6 +1287,7 @@ public class Canvas {
         c.foundKind = foundKind;
         c.walkMessage = walkMessage;
         c.weighted = Edge.isWeighted(edgeList);
+        c.edges = edgeList;
         sidePanel.display(c);
     }
 

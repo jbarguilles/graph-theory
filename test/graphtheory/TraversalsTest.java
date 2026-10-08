@@ -26,6 +26,41 @@ public class TraversalsTest {
         for (Edge e : eList) assertTrue(w.uses(e));
     }
 
+    // ---------- Tour ----------
+
+    @Test
+    public void tour_needsAnEdge() {
+        vertices(a);
+        assertFalse(Traversals.hasTour(vList, eList));
+    }
+
+    @Test
+    public void tour_undirectedPathCanGoThereAndBack() {
+        vertices(a, b, c, d);   // d is isolated and does not matter
+        und(a, b);
+        und(b, c);
+        assertTrue(Traversals.hasTour(vList, eList));
+        assertNull(Traversals.eulerTour(vList, eList));
+    }
+
+    @Test
+    public void tour_respectsDirection() {
+        vertices(a, b, c);
+        arc(a, b);
+        arc(b, c);
+        assertFalse(Traversals.hasTour(vList, eList));
+        arc(c, a);
+        assertTrue(Traversals.hasTour(vList, eList));
+    }
+
+    @Test
+    public void tour_edgesInTwoComponents_none() {
+        vertices(a, b, c, d);
+        und(a, b);
+        und(c, d);
+        assertFalse(Traversals.hasTour(vList, eList));
+    }
+
     // ---------- Euler ----------
 
     @Test

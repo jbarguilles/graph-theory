@@ -109,15 +109,23 @@ public final class PanelText {
         return foundKind.charAt(0) + foundKind.substring(1).toLowerCase() + " (found)";
     }
 
-    /** The walk's fact lines, shown under the walk itself. */
-    public static String[] walkFacts(Walk w, boolean weighted) {
+    /**
+     * The walk's fact lines, shown under the walk itself. Only the kinds on its own side of
+     * CONTEXT.md's two lists: trail and path while open; circuit, cycle and tour once closed.
+     * graphEdges are the graph's edges, which a tour must all cross.
+     */
+    public static String[] walkFacts(Walk w, boolean weighted, List<Edge> graphEdges) {
         List<String> lines = new ArrayList<String>();
         lines.add("Length: " + w.length());
         if (weighted) lines.add("Weight: " + w.weight());
         lines.add("Kind: " + w.kindName());
-        lines.add("Trail: " + yesNo(w.isTrail()) + "   Path: " + yesNo(w.isPath()));
-        lines.add("Closed: " + yesNo(w.isClosed()) + "   Circuit: " + yesNo(w.isCircuit())
-                + "   Cycle: " + yesNo(w.isCycle()));
+        lines.add("Closed: " + yesNo(w.isClosed()));
+        if (w.isClosed()) {
+            lines.add("Circuit: " + yesNo(w.isCircuit()) + "   Cycle: " + yesNo(w.isCycle())
+                    + "   Tour: " + yesNo(w.isTour(graphEdges)));
+        } else {
+            lines.add("Trail: " + yesNo(w.isTrail()) + "   Path: " + yesNo(w.isPath()));
+        }
         return lines.toArray(new String[0]);
     }
 

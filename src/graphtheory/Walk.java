@@ -115,6 +115,11 @@ public class Walk {
         return new HashSet<Vertex>(allButLast).size() == allButLast.size();
     }
 
+    /** Closed and crosses every edge in graphEdges at least once (CONTEXT.md, Tour). */
+    public boolean isTour(List<Edge> graphEdges) {
+        return isClosed() && edges.containsAll(graphEdges);
+    }
+
     /** Sum of its edges' weights, counting repeats (CONTEXT.md, Weight of a walk). */
     public int weight() {
         int w = 0;
