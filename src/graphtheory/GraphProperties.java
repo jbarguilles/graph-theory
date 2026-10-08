@@ -256,6 +256,177 @@ public class GraphProperties {
         return (vList.size() + 1) * rowH + 6;
     }
 
+    // ---- Degree distribution ----
+
+/**
+ * Returns the degree distribution as a sorted list of [degree, count] pairs.
+ * Degree is measured with Vertex.getDegree() (undirected + in + out), matching
+ * the Node Properties table.
+ *
+ * Rows are sorted by degree ascending. Vertices with degree 0 are included.
+ * Returns an empty list for an empty graph.
+ */
+public List<int[]> degreeDistribution(Vector<Vertex> vList) {
+    List<int[]> result = new ArrayList<int[]>();
+    if (vList.isEmpty()) return result;
+
+    Map<Integer, Integer> counts = new HashMap<Integer, Integer>();
+    for (Vertex v : vList) {
+        int d = v.getDegree();
+        Integer c = counts.get(d);
+        counts.put(d, c == null ? 1 : c + 1);
+    }
+
+    List<Integer> degrees = new ArrayList<Integer>(counts.keySet());
+    Collections.sort(degrees);
+    for (int d : degrees) {
+        result.add(new int[] { d, counts.get(d) });
+    }
+    return result;
+}
+
+/**
+ * Formats the degree distribution as one line per degree, e.g.
+ *   "deg 1: 2 vertices (50%)"
+ * Truncates the whole string at maxLen characters if needed.
+ */
+public String formatDegreeDistribution(Vector<Vertex> vList, int maxLen) {
+    if (vList.isEmpty()) return "\u2014";
+
+    List<int[]> dist = degreeDistribution(vList);
+    int n = vList.size();
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < dist.size(); i++) {
+        if (i > 0) sb.append("   ");
+        int[] row = dist.get(i);
+        int deg = row[0];
+        int cnt = row[1];
+        int pct = Math.round(100f * cnt / n);
+        sb.append("deg ").append(deg).append(": ")
+          .append(cnt)
+          .append(cnt == 1 ? " vertex" : " vertices")
+          .append(" (").append(pct).append("%)");
+    }
+
+    String result = sb.toString();
+    if (result.length() > maxLen) {
+        result = result.substring(0, Math.max(0, maxLen - 3)) + "...";
+    }
+    return result;
+}
+
+/**
+ * Draws the degree distribution as a bar histogram, matplotlib-style:
+ * grey plot area, faint horizontal gridlines, blue bars, tick labels as
+ * fractions of |V| on the y-axis, and integer degrees on the x-axis.
+ *
+ * Returns the total height used (pixels), so callers can stack panels below.
+ */
+public int drawDegreeHistogram(Graphics g, Vector<Vertex> vList, int x, int y,
+                               int plotW, int plotH) {
+    int leftPad   = 60;
+    int bottomPad = 40;
+    int topPad    = 10;
+    int rightPad  = 10;
+
+    int totalW = plotW + leftPad + rightPad;
+    int totalH = plotH + bottomPad + topPad;
+
+    g.setColor(Color.BLACK);
+    g.drawString("Degree Distribution", x, y - 5);
+
+    if (vList.isEmpty()) return totalH;
+
+    // ----- Data -----
+    List<int[]> dist = degreeDistribution(vList);
+    int n = vList.size();
+
+    int maxDeg = 0;
+    for (int[] row : dist) maxDeg = Math.max(maxDeg, row[0]);
+    int[] count = new int[maxDeg + 1];
+    for (int[] row : dist) count[row[0]] = row[1];
+
+    double maxFrac = 0.0;
+    for (int c : count) maxFrac = Math.max(maxFrac, (double) c / n);
+    double axisMax = Math.ceil(maxFrac * 20.0) / 20.0;
+    if (axisMax < 0.10) axisMax = 0.10;
+
+    // ----- Plot rectangle -----
+    int plotX = x + leftPad;
+    int plotY = y + topPad;
+    int plotRight = plotX + plotW;
+    int plotBottom = plotY + plotH;
+
+    g.setColor(new Color(0xF0, 0xF0, 0xF0));
+    g.fillRect(plotX, plotY, plotW, plotH);
+
+    g.setColor(new Color(0xDD, 0xDD, 0xDD));
+    for (double f = 0.05; f <= axisMax + 1e-9; f += 0.05) {
+        int gy = plotBottom - (int) Math.round(f / axisMax * plotH);
+        g.drawLine(plotX, gy, plotRight, gy);
+    }
+
+    // ----- Bars -----
+    int slots = maxDeg + 1;
+    double slotW = (double) plotW / slots;
+    double gap = slotW * 0.10;
+    int barW = (int) Math.round(slotW - gap);
+
+    for (int d = 0; d <= maxDeg; d++) {
+        double frac = (double) count[d] / n;
+        int barH = (int) Math.round(frac / axisMax * plotH);
+        int barX = plotX + (int) Math.round(d * slotW + gap / 2);
+        int barY = plotBottom - barH;
+
+        g.setColor(new Color(0x00, 0x00, 0xEE));
+        g.fillRect(barX, barY, barW, barH);
+        g.setColor(Color.BLACK);
+        g.drawRect(barX, barY, barW, barH);
+    }
+
+    g.setColor(Color.BLACK);
+    g.drawRect(plotX, plotY, plotW, plotH);
+
+    // ----- Y-axis tick labels -----
+    java.awt.FontMetrics fm = g.getFontMetrics();
+    g.setColor(Color.BLACK);
+    for (double f = 0.0; f <= axisMax + 1e-9; f += 0.05) {
+        int gy = plotBottom - (int) Math.round(f / axisMax * plotH);
+        String label = String.format("%.2f", f);
+        g.drawString(label, plotX - fm.stringWidth(label) - 6, gy + 4);
+        g.drawLine(plotX - 3, gy, plotX, gy);
+    }
+
+    // ----- X-axis tick labels -----
+    for (int d = 0; d <= maxDeg; d++) {
+        int cx = plotX + (int) Math.round((d + 0.5) * slotW);
+        String label = "" + d;
+        g.drawString(label, cx - fm.stringWidth(label) / 2, plotBottom + 14);
+        g.drawLine(cx, plotBottom, cx, plotBottom + 3);
+    }
+
+    // ----- Axis labels -----
+    String xLabel = "degree";
+    g.drawString(xLabel, plotX + plotW / 2 - fm.stringWidth(xLabel) / 2,
+                 plotBottom + bottomPad - 4);
+
+    java.awt.Graphics2D g2 = (java.awt.Graphics2D) g.create();
+    try {
+        String yLabel = "fraction of nodes";
+        int textW = fm.stringWidth(yLabel);
+        int textH = fm.getAscent();
+        g2.rotate(-Math.PI / 2, x + 14, plotY + plotH / 2);
+        g2.setColor(Color.BLACK);
+        g2.drawString(yLabel,
+                      (float) (x + 14 - textH / 2.0),
+                      (float) (plotY + plotH / 2 + textW / 2.0));
+    } finally {
+        g2.dispose();
+    }
+
+    return totalH;
+}
+
     // ---- Bridge detection (Tarjan) ----
 
     public void computeBridges(Vector<Vertex> vList, Vector<Edge> eList) {

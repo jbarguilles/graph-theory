@@ -548,7 +548,11 @@ public class Canvas {
                 int nodeTableHeight = (vertexList.size() + 2) * 18 + 10;
 
                 int listY = nodeY + nodeTableHeight + 20;
-                gP.drawAdjacencyList(g2, vertexList, 10, listY);
+int listHeight = gP.drawAdjacencyList(g2, vertexList, 10, listY);
+
+int histY = listY + listHeight + 30;
+int histPlotW = Math.min(360, getWidth() - 140);
+gP.drawDegreeHistogram(g2, vertexList, 10, histY, histPlotW, 180);
 
                 int captionY = Math.max(
                         nodeY + (vertexList.size() + 2) * 18 + 40,
@@ -578,10 +582,11 @@ public class Canvas {
                 + matrixHeight + 20
                 + 34 * 16 + 20;
         int leftHeight = 10
-                       + THUMB_H + 20
-                       + (vertexList.size() + 2) * 18 + 30
-                       + (vertexList.size() + 1) * 18 + 20
-                       + 80;
+               + THUMB_H + 20
+               + (vertexList.size() + 2) * 18 + 30       // node table
+               + (vertexList.size() + 1) * 18 + 20       // adjacency list
+               + 240                                     // degree histogram
+               + 80;
 
         int neededHeight = Math.max(rightHeight, leftHeight) + 60;
         neededHeight = Math.max(neededHeight, height);
