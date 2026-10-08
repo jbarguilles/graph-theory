@@ -154,13 +154,92 @@ public class GraphFileTest {
 
     @Test
     public void rejects_otherVersion() {
-        assertRejected("Line 1: unsupported version (this app reads 'graph-theory 1')", "graph-theory 2");
+        assertRejected("Line 1: unsupported version (this app reads 'graph-theory 1' and 'graph-theory 2')", "graph-theory 3");
     }
 
     @Test
     public void rejects_unknownKeyword() {
-        assertRejected("Line 2: unknown keyword 'node' (expected vertex, edge or arc)",
+        assertRejected("Line 2: unknown keyword 'node' (expected vertex, edge, arc or prefer)",
                        "graph-theory 1", "node a");
+    }
+
+    @Test
+    public void write_withPreferences_isVersion2_withPreferLinesLast() {
+        Vertex a = new Vertex("a", 0, 0), b = new Vertex("b", 10, 0), c = new Vertex("c", 20, 0);
+        Vector<Vertex> vs = new Vector<Vertex>(java.util.Arrays.asList(a, b, c));
+        Vector<Edge> es = new Vector<Edge>(java.util.Arrays.asList(new Edge(a, b, false), new Edge(c, a, true)));
+        a.preferences = new Vector<Vertex>(java.util.Arrays.asList(c, b));
+        assertEquals(file("graph-theory 2",
+                          "vertex a 0 0", "vertex b 10 0", "vertex c 20 0",
+                          "edge a b 1", "arc c a 1",
+                          "prefer a c b"),
+                     GraphFile.write(vs, es));
+    }
+
+    @Test
+    public void roundTrip_preferences() throws Exception {
+        String text = file("graph-theory 2",
+                           "vertex a 0 0", "vertex b 10 0", "vertex c 20 0",
+                           "edge a b 1", "edge a c 1",
+                           "prefer a c b", "prefer b a");
+        GraphFile.Data d = GraphFile.read(text);
+        assertEquals(text, GraphFile.write(d.vertices, d.edges));
+        assertNull(d.vertices.get(2).preferences);
+    }
+
+    @Test
+    public void read_version1_stillReads() throws Exception {
+        assertEquals(1, read("graph-theory 1", "vertex a").vertices.size());
+    }
+
+    @Test
+    public void read_preferInVersion1_rejected() {
+        assertRejected("Line 4: prefer lines need the header 'graph-theory 2'",
+                "graph-theory 1", "vertex a", "vertex b", "prefer a b");
+    }
+
+    @Test
+    public void read_preferBeforeAnEdge_rejected() {
+        assertRejected("Line 5: vertex, edge and arc lines must come before prefer lines",
+                "graph-theory 2", "vertex a", "vertex b", "prefer a b", "edge a b");
+    }
+
+    @Test
+    public void read_preferMustNameExactlyTheNeighbours() {
+        assertRejected("Line 7: 'a' must rank each of its neighbours exactly once: b, c",
+                "graph-theory 2", "vertex a", "vertex b", "vertex c", "edge a b", "edge c a", "prefer a b");
+        assertRejected("Line 5: 'a' must rank each of its neighbours exactly once: b",
+                "graph-theory 2", "vertex a", "vertex b", "edge a b", "prefer a b b");
+    }
+
+    @Test
+    public void read_preferForVertexWithNoNeighbours_rejected() {
+        assertRejected("Line 4: 'a' has no neighbours, so it cannot have a prefer line",
+                "graph-theory 2", "vertex a", "vertex b", "prefer a b");
+    }
+
+    @Test
+    public void read_preferNamingUnknownVertex_rejected() {
+        assertRejected("Line 5: unknown vertex 'q' (declare it with a vertex line first)",
+                "graph-theory 2", "vertex a", "vertex b", "edge a b", "prefer a q");
+    }
+
+    @Test
+    public void read_preferAcceptsAnArcInNeighbour() throws Exception {
+        GraphFile.Data d = read("graph-theory 2", "vertex a", "vertex c", "arc c a", "prefer a c");
+        assertEquals(java.util.Arrays.asList(d.vertices.get(1)), d.vertices.get(0).preferences);
+    }
+
+    @Test
+    public void read_secondPreferForSameVertex_rejected() {
+        assertRejected("Line 6: 'a' already has a prefer line",
+                "graph-theory 2", "vertex a", "vertex b", "edge a b", "prefer a b", "prefer a b");
+    }
+
+    @Test
+    public void read_preferWithNoNames_rejected() {
+        assertRejected("Line 4: expected 'prefer <vertex> <neighbour> ...'",
+                "graph-theory 2", "vertex a", "vertex b", "prefer a");
     }
 
     @Test

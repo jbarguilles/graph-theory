@@ -124,4 +124,16 @@ public class GraphPropertiesTest {
         g.dispose();
         assertEquals(GraphProperties.degreeDistributionsHeight(new Vector<Edge>()), used);
     }
+
+    @Test
+    public void distributionTooltip_namesTheDegreeAndCount() {
+        Vertex a = new Vertex("a", 0, 0), b = new Vertex("b", 0, 0), c = new Vertex("c", 0, 0);
+        Vector<Vertex> vs = new Vector<Vertex>(java.util.Arrays.asList(a, b, c));
+        Vector<Edge> es = new Vector<Edge>(java.util.Arrays.asList(new Edge(a, b, false)));
+        addUndirectedEdge(a, b);   // DegreeDistribution reads Vertex.degree(), i.e. the neighbour vectors
+        // One chart (degree). Slots 0 and 1; plotW 200 -> slot width 100. Plot starts at x 60, y 22.
+        assertEquals("degree 1: 2 vertices (0.67)", GraphProperties.distributionTooltip(vs, es, 0, 0, 200, 60 + 150, 100));
+        assertEquals("degree 0: 1 vertex (0.33)", GraphProperties.distributionTooltip(vs, es, 0, 0, 200, 60 + 10, 100));
+        assertNull(GraphProperties.distributionTooltip(vs, es, 0, 0, 200, 5, 100));
+    }
 }

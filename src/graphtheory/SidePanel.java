@@ -126,8 +126,8 @@ public class SidePanel extends JPanel implements Scrollable {
                 }
             }
         });
-        // Once clicked the list keeps focus for its arrow keys, but Ctrl+A/C/V/X fall through
-        // to the menu accelerators (Add Vertex, Greedy Coloring, ...) instead of list actions.
+        // Once clicked the list keeps focus for its arrow keys, but Ctrl+A/V/X fall through
+        // to the menu accelerators (Add Vertex, ...) instead of list actions; Ctrl+C does nothing here.
         for (int key : new int[] {KeyEvent.VK_A, KeyEvent.VK_C, KeyEvent.VK_V, KeyEvent.VK_X}) {
             pathList.getInputMap().put(KeyStroke.getKeyStroke(key, InputEvent.CTRL_DOWN_MASK), "none");
         }

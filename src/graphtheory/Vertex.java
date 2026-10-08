@@ -28,6 +28,11 @@ public class Vertex implements Comparable {
     public Vector<Vertex> outNeighbors;
     public boolean isCutpoint;
     public boolean isRoot;
+    /**
+     * This vertex's preference list (CONTEXT.md): its neighbours, most preferred first.
+     * null = no list. PreferenceLists.sync keeps it naming exactly the neighbours.
+     */
+    public Vector<Vertex> preferences = null;
     /** Radius of a vertex on the canvas. Hit-testing, edge endpoints and drawing all use it. */
     public static final int RADIUS = 18;
 
@@ -74,12 +79,9 @@ public class Vertex implements Comparable {
 
     public int degree() {
         int d = 0;
-        boolean sawSelfLoop = false;
         for (Vertex v : undirectedNeighbors) {
-            if (v == this) sawSelfLoop = true;
-            else d++;
+            d += (v == this) ? 2 : 1;
         }
-        if (sawSelfLoop) d += 2;
         return d;
     }
 

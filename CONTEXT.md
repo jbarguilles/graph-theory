@@ -50,15 +50,69 @@ A connection between two vertices. Every edge is either **directed** or **undire
 
 A set of vertices and edges. This project supports **mixed graphs** — graphs containing both directed and undirected edges simultaneously.
 
-**Graph file** — a saved graph: its vertices (name, position, root) and edges (endpoints, direction, weight). It holds nothing derived or analytical — no cutpoints, coloring, walks or selected pair. Opening a file whose vertices lack positions arranges them, which counts as an unsaved change.
+**Order** — the number of vertices, |V|.
+
+**Size** — the number of edges, |E|. Every edge counts once: each parallel edge, each self-loop, each arc.
+
+**Magnitude** — order + size, |V| + |E|.
+
+**Simple graph** — no self-loops, and no two edges joining the same pair of vertices, in any combination of directions — except that the two opposite arcs (a, b) and (b, a) may both be present.
+
+**Empty graph** — a graph with at least one vertex and no edges.
+
+**Complete graph** — a simple graph in which every two vertices are joined both ways: by an undirected edge, or by both arcs (a, b) and (b, a). A mixed graph can be complete.
+
+**Density** — for a simple graph only: the fraction of ordered pairs of distinct vertices (u, v) such that one edge leads from u to v. An undirected edge counts for both (u, v) and (v, u), so for a graph with only undirected edges this is |E| / (n(n−1)/2). A graph with at least two vertices is complete exactly when its density is 1. Undefined for graphs with fewer than two vertices or that are not simple.
+
+**Cyclic / Acyclic** — a graph is cyclic if it contains a **Cycle** (see Walk), respecting direction and counting parallel edges and self-loops. So {a, b} twice is cyclic (a cycle of length 2), and so is {a, b} with (b, a); the arcs (a, b), (b, c), (a, c) are acyclic.
+
+**Forest** — a graph with no cycle when direction is ignored (arcs treated as undirected edges), still counting parallel edges and self-loops. **Tree** — a connected forest. A forest describes the shape of the graph, so the directed path (a, b), (b, c) is a tree.
+
+Because of the difference, a graph can be acyclic without being a forest: (a, b), (b, c), (a, c) has no cycle, but ignoring direction it is a triangle.
+
+**Rooted tree** — a tree with one root. **Rooted forest** — a forest each of whose components has a root.
+
+**Star** — a tree with at least three vertices in which one vertex (the centre) is adjacent to all the others.
+
+**Bridge** — an edge whose removal increases the number of components (ignoring direction). A parallel edge is never a bridge (its copy still joins the pair), and neither is a self-loop.
+
+**Nonseparable** — connected with no cutpoint. A single vertex, and two vertices joined by one edge, are nonseparable.
+
+**Block** — a maximal nonseparable subgraph (ignoring direction). Every edge lies in exactly one block; parallel edges lie in the same block; an isolated vertex is a block on its own; a self-loop lies in a block containing its vertex and does not change which vertices form the blocks. A **nontrivial block** has at least three vertices.
+
+**Proper colouring** — a colour for each vertex such that adjacent vertices (ignoring direction) get different colours. A graph with a self-loop has no proper colouring. **Chromatic number** χ(G) — the fewest colours a proper colouring needs. A **greedy colouring** is a proper colouring found by colouring vertices one at a time; it may use more than χ(G) colours.
+
+**Bipartite** — the vertices split into two sets so that every edge (ignoring direction) joins the two sets; equivalently, χ(G) ≤ 2. A single vertex is bipartite; a graph with a self-loop is not. **Complete bipartite** K_{m,k} — a simple bipartite graph with sides of m and k vertices in which every vertex of one side is adjacent to every vertex of the other.
+
+**Matching** — a set of edges, no two sharing an endpoint, ignoring direction; a self-loop is never in a matching. Parallel edges are interchangeable in a matching.
+
+- **Maximal matching** — a matching that no further edge can be added to. There are usually many; which one is shown depends on the order edges are tried.
+- **Maximum matching** — a matching with the most edges possible. Every maximum matching is maximal, not the reverse.
+- **Perfect matching** — a matching that covers every vertex; it exists exactly when a maximum matching covers every vertex.
+
+**Preference list** — a vertex's ranking of its neighbours other than itself (ignoring direction), most preferred first, each neighbour once however many edges join them. A vertex either has no preference list or has one naming exactly those neighbours: when it gains a new neighbour, that neighbour joins the end of its list; when it loses its last edge to a neighbour, that neighbour leaves the list; a vertex left with no neighbours has no list. Preference lists are part of the graph — saved in the graph file, and changing one is an unsaved change.
+
+**Stable matching** — for a bipartite graph whose vertices all have preference lists: a matching with no **blocking pair**, i.e. two adjacent vertices, not matched to each other, who each are either unmatched or prefer the other to their current partner. One side **proposes** (Gale–Shapley); the result is the best stable matching for the proposing side, so choosing the other side can give a different stable matching. Some vertices may be left unmatched.
+
+**Graph file** — a saved graph: its vertices (name, position, root, preference list) and edges (endpoints, direction, weight). It holds nothing derived or analytical — no cutpoints, coloring, walks or selected pair. Opening a file whose vertices lack positions arranges them, which counts as an unsaved change.
 
 **Unsaved changes** — any edit to what a graph file holds, including moving a vertex. Analysis (coloring, building walks, selecting a pair, viewing Properties) is never an unsaved change.
 
-**Minimum vertex cut** — a smallest set of vertices whose removal disconnects the graph; its size is the vertex connectivity.
+**Connected** — every two vertices are joined by a walk when direction is ignored (arcs treated as undirected edges). A graph with no vertices is neither connected nor disconnected.
 
-**Minimum edge cut** — a smallest set of edges whose removal disconnects the graph; its size is the edge connectivity.
+**Component** — a maximal connected set of vertices, again ignoring direction.
+
+**Strongly connected** — every vertex reaches every other by a walk that respects direction. A single vertex is strongly connected (the trivial walk). Only meaningful when the graph has arcs; without them it is the same as connected.
+
+**Minimum vertex cut** — a smallest set of vertices whose removal disconnects the graph (ignoring direction); its size is the **vertex connectivity** κ(G). A disconnected graph has κ = 0. If no set of vertices disconnects the graph (every two vertices are adjacent), κ = n − 1 by convention and there is no minimum vertex cut.
+
+**Minimum edge cut** — a smallest set of edges whose removal disconnects the graph (ignoring direction); its size is the **edge connectivity** λ(G). Parallel edges are separate edges, so each must be removed. A disconnected graph has λ = 0.
 
 _Avoid_: "witness" for these — name the cut.
+
+**Adjacency matrix** — entry (u, v) counts the edges along which you can leave u and arrive at v. An undirected edge {u, v} adds 1 to both (u, v) and (v, u); an arc (u, v) adds 1 to (u, v) only (read row → column). An undirected self-loop at u adds 2 to (u, u); a directed self-loop adds 1. So parallel edges show as counts above 1, and for every vertex the row sum is degree + out-degree and the column sum is degree + in-degree.
+
+_Avoid_: a 0/1 adjacency matrix — it hides parallel edges.
 
 ---
 
@@ -131,7 +185,7 @@ They follow the walk rules exactly, including direction, so there is no minimum 
 
 - **Graph window**: a side panel beside the canvas describes, in this order, whatever currently exists: the selected vertices (their node properties), the selected pair (adjacency, reachability, distance, its paths), and the walk. Nothing is drawn over the graph.
 - **Built and found walks**: a walk is either built click by click, or found by an Euler or Hamiltonian search. A found walk is read-only: clicking starts a new built walk in its place, and adding or removing a vertex or edge, or changing a weight, clears it (moving or renaming a vertex does not).
-- **Properties tab**: shows a table of node properties for all vertices, plus the adjacency matrix and distance matrix. It sits beside the **Graph** tab and is recomputed whenever it is opened.
+- **Properties tab**: sits beside the **Graph** tab and always describes the current graph. Four views: **Overview** (the graph picture with its minimum vertex and edge cuts, and the summary of graph properties), **Vertices** (node properties and neighbours of every vertex), **Matrices** (adjacency matrix, distance matrix, and on a weighted graph the weighted distance matrix — one at a time; ∞ = unreachable), and **Distributions** (the degree distributions). Nothing on it changes the selection on the Graph tab. Choosing the proposing side for a stable matching is analysis; editing preference lists is an edit.
 - **Color coding on canvas**: root = green ring, cutpoint = orange ring, isolated = grey ring. A vertex is never both a cutpoint and isolated, but a root can be either, so it shows both rings at once (root outermost).
 - **One meaning per colour**: blue = selection (lighter on hover), red = about to be removed, purple = bridge, teal = the walk (one being built, or a found Euler trail/tour or Hamiltonian path/cycle), amber = selected pair's path, magenta dashed = minimum vertex/edge cut (Properties picture only), grey dashed = an edge being dragged out. Analysis results are highlighted, never shown by selecting things.
 - **Parallel edges and self-loops on canvas**: every edge is drawn separately, so parallel edges and repeated self-loops are each visible and clickable on their own.

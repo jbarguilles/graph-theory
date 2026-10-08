@@ -1,6 +1,8 @@
 package graphtheory;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Vector;
@@ -8,16 +10,19 @@ import java.util.Vector;
 /**
  * Reads and writes the .graph text format (ADR 0004):
  *
- *   graph-theory 1
+ *   graph-theory 1               (or 'graph-theory 2' when preference lists are saved, ADR 0005)
  *   vertex <name> [<x> <y>] [root]
  *   edge <a> <b> [<weight>]      undirected
  *   arc  <a> <b> [<weight>]      directed a → b
+ *   prefer <vertex> <neighbour> ...   (version 2; after all vertex/edge/arc lines)
  *
  * '#' starts a comment; blank lines are ignored.
  */
 public final class GraphFile {
 
     public static final String HEADER = "graph-theory 1";
+    /** Written instead of HEADER when some vertex has a preference list (ADR 0005). */
+    public static final String HEADER_V2 = "graph-theory 2";
 
     private GraphFile() {}
 
@@ -40,7 +45,7 @@ public final class GraphFile {
 
     /** The full form: every vertex with coordinates, every edge with its weight. */
     public static String write(List<Vertex> vertices, List<Edge> edges) {
-        StringBuilder sb = new StringBuilder(HEADER).append('\n');
+        StringBuilder sb = new StringBuilder(PreferenceLists.any(vertices) ? HEADER_V2 : HEADER).append('\n');
         for (Vertex v : vertices) {
             sb.append("vertex ").append(v.name)
               .append(' ').append(v.location.x)
@@ -54,6 +59,12 @@ public final class GraphFile {
               .append(e.vertex2.name).append(' ')
               .append(e.weight).append('\n');
         }
+        for (Vertex v : vertices) {
+            if (v.preferences == null) continue;
+            sb.append("prefer ").append(v.name);
+            for (Vertex p : v.preferences) sb.append(' ').append(p.name);
+            sb.append('\n');
+        }
         return sb.toString();
     }
 
@@ -64,6 +75,10 @@ public final class GraphFile {
         Map<Vertex, Integer> rootLine = new HashMap<Vertex, Integer>();
         String[] lines = text.split("\r?\n", -1);
         boolean sawHeader = false;
+        int version = 0;
+        boolean sawPrefer = false;
+        List<String[]> prefers = new ArrayList<String[]>();
+        List<Integer> preferLines = new ArrayList<Integer>();
 
         for (int i = 0; i < lines.length; i++) {
             int lineNo = i + 1;
@@ -78,22 +93,67 @@ public final class GraphFile {
                 if (!t[0].equals("graph-theory")) {
                     throw new FormatException(lineNo, "not a graph file (expected '" + HEADER + "')");
                 }
-                if (t.length != 2 || !t[1].equals("1")) {
-                    throw new FormatException(lineNo, "unsupported version (this app reads '" + HEADER + "')");
+                if (t.length != 2 || !(t[1].equals("1") || t[1].equals("2"))) {
+                    throw new FormatException(lineNo,
+                            "unsupported version (this app reads '" + HEADER + "' and '" + HEADER_V2 + "')");
                 }
+                version = Integer.parseInt(t[1]);
                 sawHeader = true;
-            } else if (t[0].equals("vertex")) {
-                readVertex(t, lineNo, data, byName, rootLine);
-            } else if (t[0].equals("edge") || t[0].equals("arc")) {
-                readEdge(t, lineNo, data, byName);
+            } else if (t[0].equals("vertex") || t[0].equals("edge") || t[0].equals("arc")) {
+                if (sawPrefer) {
+                    throw new FormatException(lineNo,
+                            "vertex, edge and arc lines must come before prefer lines");
+                }
+                if (t[0].equals("vertex")) readVertex(t, lineNo, data, byName, rootLine);
+                else readEdge(t, lineNo, data, byName);
+            } else if (t[0].equals("prefer")) {
+                if (version < 2) {
+                    throw new FormatException(lineNo, "prefer lines need the header '" + HEADER_V2 + "'");
+                }
+                if (t.length < 3) {
+                    throw new FormatException(lineNo, "expected 'prefer <vertex> <neighbour> ...'");
+                }
+                sawPrefer = true;
+                prefers.add(t);
+                preferLines.add(lineNo);
             } else {
                 throw new FormatException(lineNo,
-                        "unknown keyword '" + t[0] + "' (expected vertex, edge or arc)");
+                        "unknown keyword '" + t[0] + "' (expected vertex, edge, arc or prefer)");
             }
         }
         if (!sawHeader) throw new FormatException(1, "empty file (expected '" + HEADER + "')");
         checkRoots(data, rootLine);
+        readPreferences(prefers, preferLines, data, byName);
         return data;
+    }
+
+    /** Each prefer line must rank exactly its vertex's neighbours, once each (CONTEXT.md, Preference list). */
+    private static void readPreferences(List<String[]> prefers, List<Integer> lines, Data data,
+                                        Map<String, Vertex> byName) throws FormatException {
+        for (int i = 0; i < prefers.size(); i++) {
+            String[] t = prefers.get(i);
+            int lineNo = lines.get(i);
+            Vertex v = lookup(t[1], lineNo, byName);
+            if (v.preferences != null) {
+                throw new FormatException(lineNo, "'" + v.name + "' already has a prefer line");
+            }
+            List<Vertex> nbrs = PreferenceLists.neighboursOf(v, data.edges);
+            if (nbrs.isEmpty()) {
+                throw new FormatException(lineNo,
+                        "'" + v.name + "' has no neighbours, so it cannot have a prefer line");
+            }
+            Vector<Vertex> list = new Vector<Vertex>();
+            for (int k = 2; k < t.length; k++) list.add(lookup(t[k], lineNo, byName));
+            boolean exact = list.size() == nbrs.size() && new HashSet<Vertex>(list).size() == list.size()
+                    && list.containsAll(nbrs);
+            if (!exact) {
+                StringBuilder names = new StringBuilder();
+                for (Vertex n : nbrs) names.append(names.length() > 0 ? ", " : "").append(n.name);
+                throw new FormatException(lineNo,
+                        "'" + v.name + "' must rank each of its neighbours exactly once: " + names);
+            }
+            v.preferences = list;
+        }
     }
 
     private static void readVertex(String[] t, int lineNo, Data data,
