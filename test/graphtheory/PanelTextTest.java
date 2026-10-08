@@ -104,4 +104,32 @@ public class PanelTextTest {
                 "Closed: no   Circuit: no   Cycle: no"), Arrays.asList(PanelText.walkFacts(w, false)));
         assertEquals("Weight: 3", PanelText.walkFacts(w, true)[1]);
     }
+
+    @Test
+    public void neighbours_notation() {
+        Vertex a = new Vertex("a", 0, 0), b = new Vertex("b", 0, 0), c = new Vertex("c", 0, 0),
+               d = new Vertex("d", 0, 0), e = new Vertex("e", 0, 0);
+        java.util.List<Vertex> vs = java.util.Arrays.asList(a, b, c, d, e);
+        java.util.List<Edge> es = java.util.Arrays.asList(new Edge(a, b, false), new Edge(b, a, false),
+                new Edge(a, c, false), new Edge(a, d, true), new Edge(e, a, true), new Edge(a, a, true));
+        assertEquals("b \u00d72, c, \u2192a, \u2192d, \u2190e", PanelText.neighbours(a, vs, es));
+    }
+
+    @Test
+    public void neighbours_isolatedIsBlank_undirectedLoopIsOwnName() {
+        Vertex a = new Vertex("a", 0, 0), b = new Vertex("b", 0, 0);
+        java.util.List<Vertex> vs = java.util.Arrays.asList(a, b);
+        assertEquals("", PanelText.neighbours(b, vs, java.util.Arrays.asList(new Edge(a, a, false))));
+        assertEquals("a", PanelText.neighbours(a, vs, java.util.Arrays.asList(new Edge(a, a, false))));
+    }
+
+    @Test
+    public void verticesRow_matchesColumns() {
+        Vertex a = new Vertex("a", 0, 0);
+        Object[] row = PanelText.verticesRow(a, java.util.Arrays.asList(a), new java.util.Vector<Edge>());
+        assertEquals(PanelText.VERTICES_COLUMNS.length, row.length);
+        assertEquals("a", row[0]);
+        assertEquals(Integer.valueOf(0), row[1]);
+        assertEquals("yes", row[4]);
+    }
 }

@@ -11,7 +11,40 @@ public final class PanelText {
     /** Column names of the table shown when several vertices are selected. */
     public static final String[] VERTEX_COLUMNS = { "Vertex", "Deg", "In", "Out", "" };
 
+    /** The Properties tab's Vertices table: the side panel's labels plus Neighbours. */
+    public static final String[] VERTICES_COLUMNS = { "Name", "Degree", "In-Degree", "Out-Degree",
+            "Isolated", "Self-loop", "Cutpoint", "Root", "Neighbours" };
+
     private PanelText() {}
+
+    /** One Vertices row; degrees are Integers so the column sorts as numbers. */
+    public static Object[] verticesRow(Vertex v, List<Vertex> vs, List<Edge> es) {
+        return new Object[] { v.name, v.degree(), v.inDegree(), v.outDegree(), yesNo(v.isIsolated()),
+                yesNo(v.hasSelfLoop()), yesNo(v.isCutpoint), yesNo(v.isRoot), neighbours(v, vs, es) };
+    }
+
+    /**
+     * Undirected neighbours, then "\u2192x" for arcs out, then "\u2190x" for arcs in, each in vertex
+     * order, "\u00d7k" for k parallel edges. A loop shows the vertex's own name ("\u2192a" if directed).
+     */
+    public static String neighbours(Vertex v, List<Vertex> vs, List<Edge> es) {
+        List<String> parts = new ArrayList<String>();
+        for (int pass = 0; pass < 3; pass++) {
+            for (Vertex w : vs) {
+                int k = 0;
+                for (Edge e : es) {
+                    if (pass == 0 && !e.directed
+                            && ((e.vertex1 == v && e.vertex2 == w) || (e.vertex2 == v && e.vertex1 == w))) k++;
+                    if (pass == 1 && e.directed && e.vertex1 == v && e.vertex2 == w) k++;
+                    if (pass == 2 && e.directed && e.vertex2 == v && e.vertex1 == w && w != v) k++;
+                }
+                if (k == 0) continue;
+                String prefix = pass == 1 ? "\u2192" : pass == 2 ? "\u2190" : "";
+                parts.add(prefix + w.name + (k > 1 ? " \u00d7" + k : ""));
+            }
+        }
+        return join(parts, ", ");
+    }
 
     /** Name/value rows describing one selected vertex (CONTEXT.md, Node Properties). */
     public static String[][] vertexProperties(Vertex v) {
